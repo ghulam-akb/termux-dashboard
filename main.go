@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/fs"
 	"math/big"
 	"net"
@@ -76,6 +77,18 @@ type CommandResponse struct {
 	Error    string `json:"error,omitempty"`
 }
 
+// File Manager Structs
+type FileEntry struct {
+	Name    string `json:"name"`
+	IsDir   bool   `json:"isDir"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"mtime"`
+}
+
+type FileDeletePayload struct {
+	Path string `json:"path"`
+}
+
 // IP Access Confirmation Cache Types
 type IPApprovalState struct {
 	Waiters []chan bool
@@ -99,7 +112,7 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow LAN connections
+		return true
 	},
 }
 
@@ -134,6 +147,18 @@ func main() {
 	mux.HandleFunc("POST /api/tts", handleTTS)
 	mux.HandleFunc("POST /api/toast", handleToast)
 	mux.HandleFunc("POST /api/execute", handleExecute)
+
+	// File Manager Endpoints
+	mux.HandleFunc("GET /api/files/list", handleFileList)
+	mux.HandleFunc("GET /api/files/download", handleFileDownload)
+	mux.HandleFunc("POST /api/files/upload", handleFileUpload)
+	mux.HandleFunc("POST /api/files/delete", handleFileDelete)
+
+	// Android API Endpoints
+	mux.HandleFunc("POST /api/android/photo", handleAndroidPhoto)
+	mux.HandleFunc("GET /api/android/photo/view", handleAndroidPhotoView)
+	mux.HandleFunc("GET /api/android/location", handleAndroidLocation)
+	mux.HandleFunc("GET /api/android/sms", handleAndroidSMS)
 
 	// WebSocket / Token Endpoints
 	mux.HandleFunc("POST /api/token", handleGetToken)
@@ -176,8 +201,8 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Step B: Check HTTP Basic Authentication (skip for WebSocket endpoint)
-		if r.URL.Path != "/ws/terminal" {
+		// Step B: Check HTTP Basic Authentication (skip for WebSocket and Photo View endpoints)
+		if r.URL.Path != "/ws/terminal" && r.URL.Path != "/api/android/photo/view" {
 			user, pass, ok := r.BasicAuth()
 			if !ok || user != basicUser || pass != basicPass {
 				w.Header().Set("WWW-Authenticate", `Basic realm="Secure Termux Dashboard"`)
@@ -188,12 +213,15 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Step C: Check Interactive Android Confirmation Dialog (Only for authenticated requests)
-		allowedInt, reasonInt := checkIPInteractive(ip)
-		if !allowedInt {
-			logBlockedAttempt(ip, r, reasonInt)
-			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintf(w, "Access Denied: Connection rejected by the device owner.\n")
-			return
+		// Skip for photo view since it's an embedded image load and doesn't trigger shell access
+		if r.URL.Path != "/api/android/photo/view" {
+			allowedInt, reasonInt := checkIPInteractive(ip)
+			if !allowedInt {
+				logBlockedAttempt(ip, r, reasonInt)
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprintf(w, "Access Denied: Connection rejected by the device owner.\n")
+				return
+			}
 		}
 
 		logConnection(ip, r)
@@ -238,7 +266,6 @@ func handleGetToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
-	// 1. Validate Token from Query URL
 	token := r.URL.Query().Get("token")
 	if !validateWSToken(token) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -246,7 +273,6 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Upgrade HTTP Connection to WebSocket
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Printf("WS Upgrade error: %v\n", err)
@@ -254,7 +280,6 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// 3. Start shell process with TTY (PTY)
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/data/data/com.termux/files/usr/bin/bash"
@@ -264,7 +289,7 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := exec.Command(shell)
-	c.Env = append(os.Environ(), "TERM=xterm-256color") // Enable full terminal ANSI render
+	c.Env = append(os.Environ(), "TERM=xterm-256color")
 
 	f, err := pty.Start(c)
 	if err != nil {
@@ -272,15 +297,14 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
-	defer c.Process.Kill() // Ensure shell process dies on disconnect
+	defer c.Process.Kill()
 
-	// 4. Pipe PTY stdout/stderr -> WebSocket
+	// Pipe PTY stdout/stderr -> WebSocket
 	go func() {
 		buf := make([]byte, 2048)
 		for {
 			n, err := f.Read(buf)
 			if err != nil {
-				// PTY read error (e.g. shell closed)
 				conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
@@ -290,7 +314,7 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// 5. Pipe WebSocket -> PTY stdin
+	// Pipe WebSocket -> PTY stdin
 	for {
 		var msg struct {
 			Type string `json:"type"`
@@ -300,15 +324,13 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		}
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			break // WebSocket closed
+			break
 		}
 
 		switch msg.Type {
 		case "input":
-			// Write keypresses directly to shell
 			f.Write([]byte(msg.Data))
 		case "resize":
-			// Update terminal rows and columns size
 			pty.Setsize(f, &pty.Winsize{
 				Rows: msg.Rows,
 				Cols: msg.Cols,
@@ -317,9 +339,242 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Check if client IP is blacklisted or whitelisted
+// ----------------------------------------------------
+// File Manager Handlers
+// ----------------------------------------------------
+
+func handleFileList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		path = "/data/data/com.termux/files/home"
+	}
+	path = filepath.Clean(path)
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read directory: " + err.Error()})
+		return
+	}
+
+	fileList := []FileEntry{}
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		fileList = append(fileList, FileEntry{
+			Name:    entry.Name(),
+			IsDir:   entry.IsDir(),
+			Size:    info.Size(),
+			ModTime: info.ModTime().Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	json.NewEncoder(w).Encode(fileList)
+}
+
+func handleFileDownload(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Path parameter missing"))
+		return
+	}
+	path = filepath.Clean(path)
+
+	// Send file download headers
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filepath.Base(path)))
+	http.ServeFile(w, r, path)
+}
+
+func handleFileUpload(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	r.Body = http.MaxBytesReader(w, r.Body, 50*1024*1024) // Limit upload to 50MB
+	err := r.ParseMultipartForm(50 * 1024 * 1024)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "File size exceeds 50MB limit"})
+		return
+	}
+
+	targetPath := r.URL.Query().Get("path")
+	if targetPath == "" {
+		targetPath = "/data/data/com.termux/files/home"
+	}
+	targetPath = filepath.Clean(targetPath)
+
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read file from form: " + err.Error()})
+		return
+	}
+	defer file.Close()
+
+	destFile := filepath.Join(targetPath, handler.Filename)
+	out, err := os.Create(destFile)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create target file: " + err.Error()})
+		return
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, file)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to write file to disk: " + err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "Uploaded", "filename": handler.Filename})
+}
+
+func handleFileDelete(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var payload FileDeletePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid payload"})
+		return
+	}
+
+	path := filepath.Clean(payload.Path)
+	if path == "/" || path == "/data" || path == "/data/data" || path == "/data/data/com.termux" {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Deleting critical system directories is forbidden"})
+		return
+	}
+
+	err := os.RemoveAll(path)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to delete: " + err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "Deleted"})
+}
+
+// ----------------------------------------------------
+// Android API Integration Handlers
+// ----------------------------------------------------
+
+func handleAndroidPhoto(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Check if termux-camera-photo is available
+	_, err := exec.LookPath("termux-camera-photo")
+	if err != nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		json.NewEncoder(w).Encode(map[string]string{"error": "termux-camera-photo tidak ditemukan. Pastikan termux-api terpasang."})
+		return
+	}
+
+	// Capture photo (using default back camera ID 0)
+	tempPhoto := "captured_temp.jpg"
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "termux-camera-photo", "-c", "0", tempPhoto)
+	if err := cmd.Run(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil foto: " + err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "captured",
+		"url":    "/api/android/photo/view",
+	})
+}
+
+func handleAndroidPhotoView(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	tempPhoto := "captured_temp.jpg"
+	if _, err := os.Stat(tempPhoto); os.IsNotExist(err) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("No captured photo available"))
+		return
+	}
+
+	http.ServeFile(w, r, tempPhoto)
+}
+
+func handleAndroidLocation(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	_, err := exec.LookPath("termux-location")
+	if err != nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		json.NewEncoder(w).Encode(map[string]string{"error": "termux-location tidak ditemukan. Pastikan GPS HP aktif & termux-api terpasang."})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	// Run termux-location -p gps (using GPS provider)
+	cmd := exec.CommandContext(ctx, "termux-location", "-p", "gps", "-r", "once")
+	output, err := cmd.Output()
+	if err != nil {
+		// Try fallback to network location provider if GPS fails
+		cmdFallback := exec.CommandContext(ctx, "termux-location", "-p", "network", "-r", "once")
+		output, err = cmdFallback.Output()
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mendapatkan lokasi GPS: " + err.Error()})
+			return
+		}
+	}
+
+	// Send raw JSON from termux-location directly to client
+	w.Write(output)
+}
+
+func handleAndroidSMS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	_, err := exec.LookPath("termux-sms-list")
+	if err != nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		json.NewEncoder(w).Encode(map[string]string{"error": "termux-sms-list tidak ditemukan. Pastikan izin membaca SMS diberikan ke Termux:API."})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Run termux-sms-list -l 5 (limit 5 recent SMS)
+	cmd := exec.CommandContext(ctx, "termux-sms-list", "-l", "5")
+	output, err := cmd.Output()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal membaca SMS: " + err.Error()})
+		return
+	}
+
+	w.Write(output)
+}
+
+// ----------------------------------------------------
+// Security & IP Helpers
+// ----------------------------------------------------
+
 func checkIPAccess(clientIP string) (bool, string) {
-	// Check Blacklist
 	if blacklistBytes, err := os.ReadFile("blacklist.txt"); err == nil {
 		lines := strings.Split(string(blacklistBytes), "\n")
 		for _, line := range lines {
@@ -329,7 +584,6 @@ func checkIPAccess(clientIP string) (bool, string) {
 		}
 	}
 
-	// Check Whitelist
 	if whitelistBytes, err := os.ReadFile("whitelist.txt"); err == nil {
 		lines := strings.Split(string(whitelistBytes), "\n")
 		hasRules := false
@@ -355,21 +609,17 @@ func checkIPAccess(clientIP string) (bool, string) {
 	return true, ""
 }
 
-// Check interactive confirmation dialog
 func checkIPInteractive(clientIP string) (bool, string) {
-	// Localhost bypasses confirmation dialog
 	if clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "localhost" {
 		return true, ""
 	}
 
 	approvalMutex.Lock()
-	// Check in-memory approval cache
 	if expiry, exists := approvedIPs[clientIP]; exists && time.Now().Before(expiry) {
 		approvalMutex.Unlock()
 		return true, ""
 	}
 
-	// Check if pending
 	state, pending := pendingApprovals[clientIP]
 	if pending {
 		ch := make(chan bool, 1)
@@ -383,19 +633,16 @@ func checkIPInteractive(clientIP string) (bool, string) {
 		return false, "Connection Rejected by User"
 	}
 
-	// Create pending
 	state = &IPApprovalState{}
 	pendingApprovals[clientIP] = state
 	approvalMutex.Unlock()
 
-	// Send notification (non-blocking)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		exec.CommandContext(ctx, "termux-notification", "-t", "Dashboard Access Request", "-c", fmt.Sprintf("IP %s is trying to connect.", clientIP)).Run()
 	}()
 
-	// Ask confirmation (blocking)
 	allowed := askUserConfirmation(clientIP)
 
 	approvalMutex.Lock()
@@ -417,7 +664,6 @@ func checkIPInteractive(clientIP string) (bool, string) {
 	return false, "Connection Rejected by User"
 }
 
-// Shows a dialog on the Android screen prompting the user to allow/deny access
 func askUserConfirmation(ip string) bool {
 	_, err := exec.LookPath("termux-dialog")
 	if err != nil {
@@ -451,7 +697,6 @@ func askUserConfirmation(ip string) bool {
 	return result.Code == 0 || strings.ToLower(result.Text) == "yes"
 }
 
-// Match IP address against a text line (supports exact match and CIDR subnet notation)
 func ipMatchesLine(clientIPStr, line string) bool {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
@@ -471,7 +716,6 @@ func ipMatchesLine(clientIPStr, line string) bool {
 	return clientIPStr == line
 }
 
-// Log connection IP and details to connections.log
 func logConnection(ip string, r *http.Request) {
 	if r.URL.Path == "/api/stats" {
 		return
@@ -494,7 +738,6 @@ func logConnection(ip string, r *http.Request) {
 	}
 }
 
-// Log blocked access attempt to connections.log
 func logBlockedAttempt(ip string, r *http.Request, reason string) {
 	logLine := fmt.Sprintf("[%s] BLOCKED: %-15s (%s) - %-4s %s - UA: %s\n",
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -514,7 +757,6 @@ func logBlockedAttempt(ip string, r *http.Request, reason string) {
 	}
 }
 
-// Check for cert.pem and key.pem, auto-generate them if missing
 func checkOrGenerateCert() error {
 	certFile := "cert.pem"
 	keyFile := "key.pem"

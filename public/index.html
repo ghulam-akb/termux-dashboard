@@ -8,6 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js Map CDN CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
         :root {
@@ -321,7 +323,7 @@
             box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
         }
 
-        button {
+        button, .btn {
             background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
             border: none;
             color: #0b0f19;
@@ -336,19 +338,20 @@
             justify-content: center;
             gap: 0.5rem;
             box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+            text-decoration: none;
         }
 
-        button:hover {
+        button:hover, .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 242, 254, 0.35);
             filter: brightness(1.1);
         }
 
-        button:active {
+        button:active, .btn:active {
             transform: translateY(0);
         }
 
-        button.btn-block {
+        button.btn-block, .btn.btn-block {
             width: 100%;
             padding: 1rem;
             margin-top: 0.5rem;
@@ -357,7 +360,7 @@
             box-shadow: 0 4px 15px rgba(191, 85, 236, 0.2);
         }
 
-        button.btn-block:hover {
+        button.btn-block:hover, .btn.btn-block:hover {
             box-shadow: 0 6px 20px rgba(191, 85, 236, 0.35);
         }
 
@@ -547,11 +550,68 @@
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
         }
+
+        /* File Explorer Table Styling */
+        .files-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .files-table th, .files-table td {
+            padding: 0.95rem 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .files-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .files-table tr.folder-row {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .files-table tr.folder-row td i {
+            color: var(--warning);
+        }
+
+        .files-table tr.file-row td i {
+            color: var(--secondary);
+        }
+
+        .files-table tr.file-row td.name-cell {
+            cursor: pointer;
+        }
+
+        .files-table tr.file-row td.name-cell:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .btn-action {
+            background: transparent;
+            box-shadow: none;
+            padding: 0.35rem 0.65rem;
+            border-radius: 8px;
+            color: var(--text-muted);
+            border: 1px solid transparent;
+            font-size: 0.95rem;
+        }
+
+        .btn-action:hover {
+            background: rgba(255, 23, 68, 0.1);
+            color: var(--danger);
+            border-color: rgba(255, 23, 68, 0.2);
+            transform: none;
+            box-shadow: none;
+        }
     </style>
-    <!-- xterm.css & xterm.js CDN Imports -->
+    <!-- xterm.css, xterm.js & Leaflet.js Map imports -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -564,6 +624,7 @@
         <nav class="tabs-nav">
             <button class="tab-btn active" data-tab="dashboard-pane"><i class="fa-solid fa-chart-simple"></i> Status</button>
             <button class="tab-btn" data-tab="terminal-pane"><i class="fa-solid fa-terminal"></i> Terminal</button>
+            <button class="tab-btn" data-tab="files-pane"><i class="fa-solid fa-folder-open"></i> Files</button>
         </nav>
 
         <div class="status-badge" id="online-status">Connected</div>
@@ -703,6 +764,28 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Card 5: Android API Integration -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-robot"></i>
+                            Android Integrations
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-top: 1.25rem;">
+                        <button class="btn-block" id="btn-android-photo" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-camera"></i> Take Camera Photo
+                        </button>
+                        <button class="btn-block" id="btn-android-location" style="background: linear-gradient(135deg, #10b981 0%, #047857 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-location-crosshairs"></i> Get GPS Location
+                        </button>
+                        <button class="btn-block" id="btn-android-sms" style="background: linear-gradient(135deg, #eab308 0%, #a16207 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-envelope"></i> List Recent SMS
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -723,7 +806,59 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab 3: File Explorer Pane -->
+        <div id="files-pane" class="tab-pane">
+            <div class="card" style="min-height: 550px; display: flex; flex-direction: column;">
+                <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div class="card-title">
+                        <i class="fa-solid fa-folder-tree"></i>
+                        File Explorer
+                    </div>
+                    <div class="file-actions" style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button id="btn-file-up" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text);"><i class="fa-solid fa-arrow-up"></i> Up</button>
+                        <label class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: #0b0f19;">
+                            <i class="fa-solid fa-upload"></i> Upload File
+                            <input type="file" id="file-upload-input" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="breadcrumbs" id="file-breadcrumbs" style="font-family: monospace; font-size: 0.9rem; color: var(--primary); margin-bottom: 1.25rem; background: rgba(0, 0, 0, 0.25); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03);">
+                    /data/data/com.termux/files/home
+                </div>
+                
+                <div class="file-list-container" style="flex: 1; overflow-y: auto; max-height: 450px;">
+                    <table class="files-table">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <th style="padding: 0.75rem;">Name</th>
+                                <th style="padding: 0.75rem; text-align: right;">Size</th>
+                                <th style="padding: 0.75rem; text-align: right;">Modified</th>
+                                <th style="padding: 0.75rem; text-align: center; width: 80px;">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file-table-body">
+                            <!-- File rows go here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <!-- Android Dialog Modal Overlay -->
+    <div id="android-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); padding: 1.5rem;">
+        <div class="card" style="max-width: 600px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; position: relative;">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-title" id="android-modal-title">Android Action Result</div>
+                <button id="btn-close-modal" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.5rem; box-shadow: none; padding: 0;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="android-modal-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
+                <!-- Dynamic content (photos, Leaflet maps, tables) goes here -->
+            </div>
+        </div>
+    </div>
 
     <footer>
         <p>Termux Dashboard &copy; 2026. Made with Glassmorphism Design.</p>
@@ -778,6 +913,8 @@
                     activePane.classList.add('active-pane');
                     if (targetTab === 'terminal-pane') {
                         initTerminal();
+                    } else if (targetTab === 'files-pane') {
+                        loadFiles(currentPath);
                     }
                 }
             });
@@ -946,7 +1083,6 @@
         let pendingCommand = null;
 
         async function initTerminal() {
-            // Already initialized? Just fit size
             if (term !== null) {
                 setTimeout(() => {
                     fitAddon.fit();
@@ -961,7 +1097,6 @@
                 return;
             }
 
-            // Create xterm instance
             term = new Terminal({
                 cursorBlink: true,
                 theme: {
@@ -976,7 +1111,6 @@
             fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
             
-            // Mount to HTML element
             term.open(document.getElementById('terminal-container'));
             
             setTimeout(() => {
@@ -986,7 +1120,6 @@
             term.write('\x1b[33mRequesting secure one-time WebSocket token...\x1b[0m\r\n');
 
             try {
-                // 1. Get temporary WebSocket token
                 const tokenRes = await fetch(`${API_URL}/api/token`, { method: 'POST' });
                 if (!tokenRes.ok) throw new Error('Auth token generation failed');
                 const tokenData = await tokenRes.json();
@@ -994,7 +1127,6 @@
 
                 term.write('\x1b[32mToken acquired. Connecting to terminal...\x1b[0m\r\n');
 
-                // 2. Open WebSocket
                 const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
                 const wsUrl = `${wsScheme}://${window.location.host}/ws/terminal?token=${token}`;
                 wsTerminal = new WebSocket(wsUrl);
@@ -1003,14 +1135,12 @@
                 wsTerminal.onopen = () => {
                     term.write('\x1b[32mConnected successfully! Ready.\x1b[0m\r\n\r\n');
                     
-                    // Send initial terminal size
                     wsTerminal.send(JSON.stringify({
                         type: 'resize',
                         rows: term.rows,
                         cols: term.cols
                     }));
 
-                    // Execute any pending quick commands
                     if (pendingCommand) {
                         wsTerminal.send(JSON.stringify({
                             type: 'input',
@@ -1020,7 +1150,6 @@
                     }
                 };
 
-                // Stream PTY stdout to xterm.js
                 wsTerminal.onmessage = (event) => {
                     term.write(new Uint8Array(event.data));
                 };
@@ -1034,7 +1163,6 @@
                     console.error('WS Error:', err);
                 };
 
-                // Send keypresses to PTY stdin
                 term.onData(data => {
                     if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
                         wsTerminal.send(JSON.stringify({
@@ -1044,7 +1172,6 @@
                     }
                 });
 
-                // Listen for window resize to adjust PTY rows/cols
                 window.addEventListener('resize', () => {
                     if (term) {
                         fitAddon.fit();
@@ -1070,9 +1197,7 @@
         const btnQuickProcesses = document.getElementById('btn-quick-processes');
         const btnQuickLs = document.getElementById('btn-quick-ls');
 
-        // Helper to trigger terminal command
         function runQuickCommand(commandText) {
-            // Switch to terminal tab
             const termTabBtn = document.querySelector('.tab-btn[data-tab="terminal-pane"]');
             if (termTabBtn) termTabBtn.click();
 
@@ -1087,20 +1212,326 @@
             }
         }
 
-        btnQuickSshStart.addEventListener('click', () => {
-            runQuickCommand('sshd');
+        btnQuickSshStart.addEventListener('click', () => runQuickCommand('sshd'));
+        btnQuickSshStop.addEventListener('click', () => runQuickCommand('pkill sshd'));
+        btnQuickProcesses.addEventListener('click', () => runQuickCommand('top -n 1 -b | head -n 15'));
+        btnQuickLs.addEventListener('click', () => runQuickCommand('ls -lh'));
+
+        // ----------------------------------------------------
+        // File Manager Frontend Logic
+        // ----------------------------------------------------
+        let currentPath = '/data/data/com.termux/files/home';
+        const fileTableBody = document.getElementById('file-table-body');
+        const fileBreadcrumbs = document.getElementById('file-breadcrumbs');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const btnFileUp = document.getElementById('btn-file-up');
+
+        async function loadFiles(path) {
+            fileTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Loading files list...</td></tr>';
+            try {
+                const res = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
+                if (!res.ok) throw new Error('Failed to read folder');
+                const files = await res.json();
+                
+                currentPath = path;
+                fileBreadcrumbs.innerText = currentPath;
+                renderFileList(files);
+            } catch (err) {
+                showToast(err.message, 'error');
+                fileTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--danger);">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderFileList(files) {
+            fileTableBody.innerHTML = '';
+            
+            // Sort folders first, then files
+            files.sort((a, b) => b.isDir - a.isDir || a.name.localeCompare(b.name));
+
+            if (files.length === 0) {
+                fileTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">Folder is empty</td></tr>';
+                return;
+            }
+
+            files.forEach(file => {
+                const row = document.createElement('tr');
+                row.className = file.isDir ? 'folder-row' : 'file-row';
+                
+                const icon = file.isDir ? '<i class="fa-solid fa-folder"></i>' : '<i class="fa-solid fa-file"></i>';
+                const sizeStr = file.isDir ? '-' : formatBytes(file.size);
+                const filePath = currentPath + '/' + file.name;
+
+                row.innerHTML = `
+                    <td class="name-cell" style="padding: 0.95rem 0.75rem;">
+                        ${icon} <span style="margin-left: 0.5rem;">${file.name}</span>
+                    </td>
+                    <td style="text-align: right; color: var(--text-muted);">${sizeStr}</td>
+                    <td style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">${file.mtime}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-action btn-delete" data-path="${filePath}"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                `;
+
+                // Navigation Events
+                if (file.isDir) {
+                    row.querySelector('.name-cell').addEventListener('click', () => loadFiles(filePath));
+                } else {
+                    row.querySelector('.name-cell').addEventListener('click', () => {
+                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
+                    });
+                }
+
+                // Delete Event
+                row.querySelector('.btn-delete').addEventListener('click', async (e) => {
+                    e.stopPropagation(); // Prevent trigger navigate
+                    if (confirm(`Apakah Anda yakin ingin menghapus "${file.name}"?`)) {
+                        try {
+                            const delRes = await fetch('/api/files/delete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path: filePath })
+                            });
+                            if (delRes.ok) {
+                                showToast('Berkas berhasil dihapus!');
+                                loadFiles(currentPath);
+                            } else {
+                                const errData = await delRes.json();
+                                showToast(errData.error || 'Gagal menghapus berkas', 'error');
+                            }
+                        } catch (err) {
+                            showToast('Gagal terhubung ke server', 'error');
+                        }
+                    }
+                });
+
+                fileTableBody.appendChild(row);
+            });
+        }
+
+        // Up Directory navigation
+        btnFileUp.addEventListener('click', () => {
+            if (currentPath === '/' || currentPath === '') return;
+            const parts = currentPath.split('/');
+            parts.pop();
+            const parentPath = parts.join('/') || '/';
+            loadFiles(parentPath);
         });
 
-        btnQuickSshStop.addEventListener('click', () => {
-            runQuickCommand('pkill sshd');
+        // Multipart File Upload Handler
+        fileUploadInput.addEventListener('change', async () => {
+            const file = fileUploadInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showToast('Mengunggah berkas...', 'success');
+
+            try {
+                const res = await fetch(`/api/files/upload?path=${encodeURIComponent(currentPath)}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    showToast('Berkas berhasil diunggah!');
+                    loadFiles(currentPath);
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Gagal mengunggah berkas', 'error');
+                }
+            } catch (err) {
+                showToast('Gagal terhubung ke server', 'error');
+            } finally {
+                fileUploadInput.value = ''; // clear file selection
+            }
         });
 
-        btnQuickProcesses.addEventListener('click', () => {
-            runQuickCommand('top -n 1 -b | head -n 15');
+        // Format bytes size
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // ----------------------------------------------------
+        // Android API Frontend Logic (Overlay Modals)
+        // ----------------------------------------------------
+        const androidModal = document.getElementById('android-modal');
+        const androidModalTitle = document.getElementById('android-modal-title');
+        const androidModalContent = document.getElementById('android-modal-content');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+
+        // Buttons
+        const btnAndroidPhoto = document.getElementById('btn-android-photo');
+        const btnAndroidLocation = document.getElementById('btn-android-location');
+        const btnAndroidSMS = document.getElementById('btn-android-sms');
+
+        function openModal(title, contentHTML) {
+            androidModalTitle.innerText = title;
+            androidModalContent.innerHTML = contentHTML;
+            androidModal.style.display = 'flex';
+        }
+
+        btnCloseModal.addEventListener('click', () => {
+            androidModal.style.display = 'none';
+            androidModalContent.innerHTML = ''; // Clear map memory or resources
         });
 
-        btnQuickLs.addEventListener('click', () => {
-            runQuickCommand('ls -lh');
+        // Close on overlay background click
+        androidModal.addEventListener('click', (e) => {
+            if (e.target === androidModal) {
+                btnCloseModal.click();
+            }
+        });
+
+        // Action 1: Capture Photo
+        btnAndroidPhoto.addEventListener('click', async () => {
+            openModal('Capturing Camera Photo', `
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
+                    <p style="margin-top: 1rem; color: var(--text-muted);">Sedang mengambil foto via termux-camera-photo...</p>
+                </div>
+            `);
+
+            try {
+                const res = await fetch('/api/android/photo', { method: 'POST' });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    openModal('Kamera Android (Captured)', `
+                        <img src="${data.url}?t=${Date.now()}" style="width: 100%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain; max-height: 50vh;" />
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Foto berhasil ditangkap menggunakan Kamera HP.</p>
+                    `);
+                } else {
+                    openModal('Ambil Foto Gagal', `
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
+                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${data.error}</p>
+                    `);
+                }
+            } catch (err) {
+                openModal('Koneksi Gagal', `<p style="color: var(--danger);">Gagal terhubung ke API Termux.</p>`);
+            }
+        });
+
+        // Action 2: GPS Location Tracker
+        btnAndroidLocation.addEventListener('click', async () => {
+            openModal('Tracking Device Location', `
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--success);"></i>
+                    <p style="margin-top: 1rem; color: var(--text-muted);">Menghubungi modul GPS HP... (Ini butuh beberapa detik)</p>
+                </div>
+            `);
+
+            try {
+                const res = await fetch('/api/android/location');
+                const data = await res.json();
+
+                if (res.ok) {
+                    const lat = data.latitude || data.lat;
+                    const lon = data.longitude || data.lon;
+                    const alt = data.altitude || 0;
+                    const acc = data.accuracy || 0;
+
+                    if (!lat || !lon) {
+                        throw new Error('Data koordinat kosong. Pastikan GPS HP aktif.');
+                    }
+
+                    openModal('Lokasi Geografis (GPS)', `
+                        <div id="map-container" style="width:100%; height:320px; border-radius:16px; border:1px solid var(--glass-border); box-shadow: 0 4px 15px rgba(0,0,0,0.3);"></div>
+                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; width: 100%; margin-top: 1rem;">
+                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Latitude</div><div class="stat-val" style="font-size:1rem;">${lat}</div></div>
+                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Longitude</div><div class="stat-val" style="font-size:1rem;">${lon}</div></div>
+                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Ketinggian</div><div class="stat-val" style="font-size:1rem;">${alt.toFixed(1)} m</div></div>
+                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Akurasi</div><div class="stat-val" style="font-size:1rem;">${acc.toFixed(1)} m</div></div>
+                        </div>
+                    `);
+
+                    // Render Leaflet Map dynamically
+                    setTimeout(() => {
+                        const map = L.map('map-container').setView([lat, lon], 15);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            attribution: '© OpenStreetMap contributors'
+                        }).addTo(map);
+
+                        L.marker([lat, lon]).addTo(map)
+                            .bindPopup(`<b>Ponsel Anda di sini</b><br>Akurasi: ${acc.toFixed(1)} meter.`)
+                            .openPopup();
+                    }, 200);
+
+                } else {
+                    openModal('GPS Tracker Gagal', `
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
+                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${data.error}</p>
+                    `);
+                }
+            } catch (err) {
+                openModal('GPS Tracker Gagal', `
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
+                    <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${err.message}</p>
+                `);
+            }
+        });
+
+        // Action 3: SMS Reader
+        btnAndroidSMS.addEventListener('click', async () => {
+            openModal('Membaca Daftar SMS...', `
+                <div style="text-align: center; padding: 2rem;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--warning);"></i>
+                    <p style="margin-top: 1rem; color: var(--text-muted);">Membaca berkas data SMS terbaru di HP...</p>
+                </div>
+            `);
+
+            try {
+                const res = await fetch('/api/android/sms');
+                const smsList = await res.json();
+
+                if (res.ok) {
+                    if (smsList.length === 0) {
+                        openModal('Daftar SMS Terakhir', `<p style="padding: 2rem; color: var(--text-muted);">Tidak ada SMS ditemukan.</p>`);
+                        return;
+                    }
+
+                    let tableRows = '';
+                    smsList.forEach(sms => {
+                        tableRows += `
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.85rem;">
+                                <td style="padding: 0.85rem 0.5rem; font-weight:600; color:var(--primary);">${sms.sender || sms.address}</td>
+                                <td style="padding: 0.85rem 0.5rem; color:var(--text-muted); font-size:0.75rem;">${sms.received || sms.date}</td>
+                                <td style="padding: 0.85rem 0.5rem; color:var(--text);">${sms.body}</td>
+                            </tr>
+                        `;
+                    });
+
+                    openModal('5 SMS Masuk Terakhir', `
+                        <div style="width: 100%; overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                                <thead>
+                                    <tr style="border-bottom: 2px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">
+                                        <th style="padding:0.5rem;">Pengirim</th>
+                                        <th style="padding:0.5rem;">Waktu</th>
+                                        <th style="padding:0.5rem;">Isi Pesan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    `);
+
+                } else {
+                    openModal('Gagal Membaca SMS', `
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
+                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${smsList.error}</p>
+                    `);
+                }
+            } catch (err) {
+                openModal('Membaca SMS Gagal', `<p style="color: var(--danger);">Gagal terhubung ke API Termux.</p>`);
+            }
         });
 
         // Loop fetching stats

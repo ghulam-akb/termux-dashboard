@@ -10,5 +10,9 @@ connections.log
 whitelist.txt
 blacklist.txt
 
+# Captured media files
+captured_temp.jpg
+captured_temp.png
+
 # OS-specific files
 .DS_Store
