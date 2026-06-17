@@ -15,6 +15,7 @@ Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfung
 7. **Keamanan IP**: Filter akses menggunakan berkas konfigurasi `whitelist.txt` dan `blacklist.txt`.
 8. **Konfirmasi Koneksi Android**: Menampilkan notifikasi dan dialog konfirmasi persetujuan di layar HP ketika ada percobaan koneksi baru dari IP eksternal.
 9. **Log Koneksi**: Mencatat setiap aktivitas koneksi masuk ke dalam file `connections.log`.
+10. **Android Wake Lock**: Otomatis mengaktifkan wake lock (`termux-wake-lock`) untuk mencegah CPU Android tidur saat server berjalan, sehingga koneksi background tetap stabil.
 
 ---
 
@@ -23,6 +24,7 @@ Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfung
 - `main.go` — Kode backend server HTTP Go, middleware keamanan, dan WebTTY.
 - `public/index.html` — Frontend statis (HTML/CSS/JS).
 - `dashboard` — Executable biner hasil kompilasi.
+- `LICENSE` — Berkas lisensi MIT untuk proyek.
 - `cert.pem` & `key.pem` — Sertifikat SSL untuk enkripsi HTTPS (dibuat otomatis).
 - `connections.log` — Log riwayat IP yang mengakses dashboard (dibuat otomatis).
 - `whitelist.txt` — Daftar IP/Subnet yang diizinkan mengakses dashboard.
@@ -84,6 +86,13 @@ nohup ./dashboard > /dev/null 2>&1 &
 ```
 
 ### Menghentikan Proses Server
+
 ```bash
 pkill dashboard
 ```
+
+---
+
+## Lisensi
+
+Proyek ini dilisensikan di bawah [Lisensi MIT](LICENSE).
