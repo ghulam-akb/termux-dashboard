@@ -33,11 +33,10 @@ Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfung
 ## Konfigurasi Keamanan
 
 ### 1. Kredensial Login
-Kredensial default:
-* **Username**: `admin`
-* **Password**: `termux`
+* **Username**: `admin` (Dapat diubah dengan mendefinisikan `DASHBOARD_USER`).
+* **Password**: Secara default, jika *environment variable* `DASHBOARD_PASSWORD` tidak ditentukan, aplikasi akan **membuat password acak sekali pakai secara otomatis** pada saat startup dan mencetaknya ke konsol terminal Termux.
 
-Untuk mengganti username dan password, set *environment variables* berikut saat menjalankan aplikasi:
+Untuk menetapkan kredensial secara manual, jalankan aplikasi dengan *environment variables* berikut:
 ```bash
 DASHBOARD_USER=username_baru DASHBOARD_PASSWORD=password_baru ./dashboard
 ```

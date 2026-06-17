@@ -1,5 +1,6 @@
 # Compiled binary
 dashboard
+dist/
 
 # SSL certificates (private keys and certs)
 cert.pem

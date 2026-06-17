@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -122,6 +123,16 @@ func initAuth() {
 	}
 	if p := os.Getenv("DASHBOARD_PASSWORD"); p != "" {
 		basicPass = p
+	} else {
+		// Generate secure random password if not provided
+		b := make([]byte, 8)
+		if _, err := rand.Read(b); err == nil {
+			basicPass = fmt.Sprintf("%x", b)
+			fmt.Printf("\n[SECURITY] DASHBOARD_PASSWORD tidak diatur. Membuat password acak sekali pakai:\n")
+			fmt.Printf("           Password: %s\n\n", basicPass)
+		} else {
+			basicPass = "termux" // Fallback
+		}
 	}
 }
 
@@ -162,14 +173,38 @@ func main() {
 	mux.Handle("/", getStaticFileHandler())
 
 	// Print startup information
-	printStartupInfo(port)
-
 	// Start HTTPS server wrapped with connection logger, IP access, and Basic Auth middleware
 	serverAddr := ":" + port
-	if err := http.ListenAndServeTLS(serverAddr, "cert.pem", "key.pem", loggingMiddleware(mux)); err != nil {
-		fmt.Printf("Error starting secure HTTPS server: %v\n", err)
-		os.Exit(1)
+	server := &http.Server{
+		Addr:    serverAddr,
+		Handler: loggingMiddleware(mux),
 	}
+
+	// Channel to listen for interrupt/termination signals
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		printStartupInfo(port)
+		if err := server.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("Error starting secure HTTPS server: %v\n", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-stopChan
+	fmt.Println("\n[INFO] Sinyal penghentian diterima. Membersihkan koneksi...")
+
+	// Graceful shutdown context with 5s timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		fmt.Printf("Error during server shutdown: %v\n", err)
+	}
+
+	fmt.Println("[INFO] Server berhenti secara aman. Selesai.")
 }
 
 // Logging and Security Middleware
