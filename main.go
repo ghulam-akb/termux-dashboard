@@ -117,6 +117,28 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+func acquireWakeLock() {
+	_, err := exec.LookPath("termux-wake-lock")
+	if err == nil {
+		if err := exec.Command("termux-wake-lock").Run(); err == nil {
+			fmt.Println("[INFO] Android Wake Lock diaktifkan (Mencegah CPU tidur).")
+		} else {
+			fmt.Printf("[WARNING] Gagal mengaktifkan Wake Lock: %v\n", err)
+		}
+	}
+}
+
+func releaseWakeLock() {
+	_, err := exec.LookPath("termux-wake-unlock")
+	if err == nil {
+		if err := exec.Command("termux-wake-unlock").Run(); err == nil {
+			fmt.Println("[INFO] Android Wake Lock dinonaktifkan.")
+		} else {
+			fmt.Printf("[WARNING] Gagal menonaktifkan Wake Lock: %v\n", err)
+		}
+	}
+}
+
 func initAuth() {
 	if u := os.Getenv("DASHBOARD_USER"); u != "" {
 		basicUser = u
@@ -138,6 +160,7 @@ func initAuth() {
 
 func main() {
 	initAuth()
+	acquireWakeLock()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -195,6 +218,7 @@ func main() {
 	// Wait for shutdown signal
 	<-stopChan
 	fmt.Println("\n[INFO] Sinyal penghentian diterima. Membersihkan koneksi...")
+	releaseWakeLock()
 
 	// Graceful shutdown context with 5s timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
