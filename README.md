@@ -1,6 +1,10 @@
 # Termux System Dashboard & Remote Console
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfungsi menampilkan metrik perangkat, mengelola file, mengeksekusi perintah diagnostik cepat, dan menyediakan akses terminal remote terenkripsi SSL/TLS.
+
+![Preview](preview.jpg)
 
 ---
 
@@ -67,6 +71,39 @@ Biner akan membuat berkas `cert.pem` dan `key.pem` secara otomatis.
 * **`POST /api/vibrate`**: Mengaktifkan getar ponsel (memerlukan `termux-api`).
 * **`POST /api/tts`**: Mengucapkan teks lewat speaker (memerlukan `termux-api`, parameter JSON: `{"text": "<teks>"}`).
 * **`POST /api/toast`**: Menampilkan notifikasi toast di layar HP (memerlukan `termux-api`, parameter JSON: `{"text": "<teks>"}`).
+
+---
+
+## Prasyarat & Kebutuhan Sistem
+
+Sebelum menjalankan aplikasi, pastikan Anda telah menginstal utilitas berikut di lingkungan Termux Anda:
+1. **Termux API**: Diperlukan untuk fitur getar, text-to-speech (TTS), dan notifikasi toast.
+   * Instal paket CLI di Termux:
+     ```bash
+     pkg install termux-api
+     ```
+   * Instal aplikasi pendamping **Termux:API** di perangkat Android Anda (dapat diunduh via [F-Droid](https://f-droid.org/packages/com.termux.api/)).
+2. **Go Compiler (Opsional)**: Hanya diperlukan jika Anda ingin memodifikasi kode sumber dan membangun ulang biner secara mandiri.
+   ```bash
+   pkg install golang
+   ```
+
+---
+
+## Panduan Instalasi & Kompilasi
+
+Jika Anda menduplikasi proyek ini atau ingin membangun biner executable sendiri dari kode sumber:
+
+1. Clone repositori ini ke dalam direktori penyimpanan Termux Anda:
+   ```bash
+   git clone https://github.com/ghulam-akb/termux-dashboard.git
+   cd termux-dashboard
+   ```
+2. Jalankan perintah kompilasi menggunakan Go:
+   ```bash
+   go build -o dashboard main.go
+   ```
+   *Biner mandiri baru bernama `dashboard` akan dibuat di dalam direktori proyek.*
 
 ---
 
