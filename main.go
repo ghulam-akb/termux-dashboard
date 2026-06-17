@@ -413,6 +413,17 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 	defer c.Process.Kill()
 
+	// Write welcoming banner to WebSocket client (WebTTY)
+	banner := fmt.Sprintf("\r\n\x1b[1;36m==================================================\x1b[0m\r"+
+		"\n\x1b[1;32m   Welcome to Secure Termux WebTTY Terminal      \x1b[0m\r"+
+		"\n\x1b[1;36m==================================================\x1b[0m\r"+
+		"\n   Device:  Android Termux\r"+
+		"\n   Shell:   %s\r"+
+		"\n   Time:    %s\r"+
+		"\n\x1b[1;30mType 'exit' to close this connection.\x1b[0m\r"+
+		"\n\x1b[1;36m==================================================\x1b[0m\r\n\r\n", shell, time.Now().Format("2006-01-02 15:04:05"))
+	conn.WriteMessage(websocket.BinaryMessage, []byte(banner))
+
 	// Pipe PTY stdout/stderr -> WebSocket
 	go func() {
 		buf := make([]byte, 2048)
@@ -1187,18 +1198,25 @@ func getStaticFileHandler() http.Handler {
 	return http.FileServer(http.FS(subFS))
 }
 
-func printStartupInfo(port string) {
-	fmt.Println("\n==================================================")
-	fmt.Println("🔒 SECURE TERMUX SYSTEM DASHBOARD (GO SSL ENGINE)")
-	fmt.Println("==================================================")
-	fmt.Println("Dashboard successfully loaded in HTTPS mode with WebTTY.")
-	fmt.Println("\nLocal Access:")
-	fmt.Printf("   👉 https://localhost:%s\n", port)
+func getOutboundIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
 
-	fmt.Println("\nNetwork Access (Wi-Fi/Tailscale):")
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
+}
+
+func getLocalIPs() []string {
+	var ips []string
+	if primary := getOutboundIP(); primary != "" {
+		ips = append(ips, primary)
+	}
+
 	ifaces, err := net.Interfaces()
 	if err == nil {
-		count := 0
 		for _, iface := range ifaces {
 			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 				continue
@@ -1222,15 +1240,39 @@ func printStartupInfo(port string) {
 				if ip == nil {
 					continue
 				}
-				fmt.Printf("   👉 https://%s:%s\n", ip.String(), port)
-				count++
+
+				exists := false
+				for _, existing := range ips {
+					if existing == ip.String() {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					ips = append(ips, ip.String())
+				}
 			}
 		}
-		if count == 0 {
-			fmt.Println("   (No active connection detected)")
+	}
+	return ips
+}
+
+func printStartupInfo(port string) {
+	fmt.Println("\n==================================================")
+	fmt.Println("🔒 SECURE TERMUX SYSTEM DASHBOARD (GO SSL ENGINE)")
+	fmt.Println("==================================================")
+	fmt.Println("Dashboard successfully loaded in HTTPS mode with WebTTY.")
+	fmt.Println("\nLocal Access:")
+	fmt.Printf("   👉 https://localhost:%s\n", port)
+
+	fmt.Println("\nNetwork Access (Wi-Fi/Tailscale):")
+	ips := getLocalIPs()
+	if len(ips) > 0 {
+		for _, ip := range ips {
+			fmt.Printf("   👉 https://%s:%s\n", ip, port)
 		}
 	} else {
-		fmt.Println("   Error fetching local IP addresses.")
+		fmt.Println("   (No active connection detected)")
 	}
 	fmt.Println("==================================================")
 	fmt.Printf("Authentication Credentials:\n")
