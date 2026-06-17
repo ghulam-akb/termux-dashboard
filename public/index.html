@@ -111,8 +111,8 @@
             width: 100%;
             margin: 0 auto;
             padding: 1.5rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            display: flex;
+            flex-direction: column;
             gap: 2rem;
         }
 
@@ -533,119 +533,25 @@
             color: var(--text-muted);
             letter-spacing: 0.5px;
         }
-
-        .terminal-screen {
-            flex: 1;
-            background: #020408;
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 1.25rem;
-            overflow-y: auto;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            color: #39ff14; /* Matrix Green */
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
-        }
-
-        .terminal-screen::-webkit-scrollbar {
+        
+        .xterm-viewport::-webkit-scrollbar {
             width: 8px;
         }
 
-        .terminal-screen::-webkit-scrollbar-track {
+        .xterm-viewport::-webkit-scrollbar-track {
             background: rgba(0, 0, 0, 0.2);
             border-radius: 10px;
         }
 
-        .terminal-screen::-webkit-scrollbar-thumb {
+        .xterm-viewport::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
         }
-
-        .terminal-screen::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .term-line {
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .term-input-line {
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        .term-output-line {
-            color: #e2e8f0;
-            padding-left: 0.5rem;
-        }
-
-        .term-error-line {
-            color: var(--danger);
-            padding-left: 0.5rem;
-        }
-
-        .term-system-line {
-            color: var(--warning);
-            font-style: italic;
-        }
-
-        .terminal-footer-form {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-        }
-
-        .term-prompt {
-            font-family: 'Courier New', Courier, monospace;
-            font-weight: bold;
-            color: var(--primary);
-            white-space: nowrap;
-        }
-
-        .term-cmd-input {
-            flex: 1;
-            background: #020408;
-            border: 1px solid var(--glass-border);
-            padding: 0.75rem 1rem;
-            border-radius: 12px;
-            color: #39ff14;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.95rem;
-            outline: none;
-            transition: all 0.3s;
-        }
-
-        .term-cmd-input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
-        }
-
-        .term-btn-exec {
-            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
-            border: none;
-            color: #0b0f19;
-            padding: 0.75rem 1.25rem;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            box-shadow: 0 4px 12px rgba(0, 242, 254, 0.2);
-        }
-
-        .term-btn-exec:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 15px rgba(0, 242, 254, 0.35);
-        }
     </style>
+    <!-- xterm.css & xterm.js CDN Imports -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 </head>
 <body>
 
@@ -802,27 +708,19 @@
 
         <!-- Tab 2: Remote Terminal -->
         <div id="terminal-pane" class="tab-pane">
-            <div class="terminal-card">
+            <div class="terminal-card" style="height: 600px;">
                 <div class="terminal-header">
                     <div class="terminal-dots">
                         <span class="terminal-dot dot-red"></span>
                         <span class="terminal-dot dot-yellow"></span>
                         <span class="terminal-dot dot-green"></span>
                     </div>
-                    <div class="terminal-title">bash - termux@android</div>
+                    <div class="terminal-title">xterm - termux@android</div>
                     <div style="width: 40px;"></div>
                 </div>
-                <div class="terminal-screen" id="terminal-screen">
-                    <div class="term-line term-system-line">Welcome to Termux Remote Console (Go Engine)</div>
-                    <div class="term-line term-system-line">Ready to execute commands...</div>
+                <div id="terminal-container" style="flex: 1; background: #020408; border-radius: 12px; padding: 0.5rem; overflow: hidden; min-height: 480px;">
+                    <!-- xterm.js mounts here -->
                 </div>
-                <form class="terminal-footer-form" id="terminal-form">
-                    <span class="term-prompt">~ $</span>
-                    <input type="text" class="term-cmd-input" id="terminal-input" placeholder="Ketik perintah (contoh: ls, top, pkg help, uptime)..." autocomplete="off">
-                    <button type="submit" class="term-btn-exec" id="btn-execute">
-                        <i class="fa-solid fa-play"></i> Run
-                    </button>
-                </form>
             </div>
         </div>
     </main>
@@ -861,12 +759,6 @@
         const btnVibrate = document.getElementById('btn-vibrate');
         const onlineStatus = document.getElementById('online-status');
 
-        // Terminal Elements
-        const terminalScreen = document.getElementById('terminal-screen');
-        const terminalForm = document.getElementById('terminal-form');
-        const terminalInput = document.getElementById('terminal-input');
-        const btnExecute = document.getElementById('btn-execute');
-
         // Tab Switching Logic
         const tabButtons = document.querySelectorAll('.tab-btn');
         const tabPanes = document.querySelectorAll('.tab-pane');
@@ -885,7 +777,7 @@
                 if (activePane) {
                     activePane.classList.add('active-pane');
                     if (targetTab === 'terminal-pane') {
-                        terminalInput.focus();
+                        initTerminal();
                     }
                 }
             });
@@ -981,62 +873,6 @@
             uptimeVal.innerText = data.uptime || 'Unavailable';
         }
 
-        // Terminal Execution Logic
-        terminalForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const command = terminalInput.value.trim();
-            if (!command) return;
-
-            // Clear input
-            terminalInput.value = '';
-
-            // Print command to screen
-            appendTerminalLine(`~ $ ${command}`, 'term-input-line');
-
-            // Disable UI
-            terminalInput.disabled = true;
-            btnExecute.disabled = true;
-
-            try {
-                const res = await fetch(`${API_URL}/api/execute`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command })
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.output) {
-                        appendTerminalLine(data.output, 'term-output-line');
-                    }
-                    if (data.error) {
-                        appendTerminalLine(`[Error] ${data.error}`, 'term-error-line');
-                    }
-                    if (data.exitCode !== 0) {
-                        appendTerminalLine(`Process exited with code ${data.exitCode}`, 'term-system-line');
-                    }
-                } else {
-                    const err = await res.json();
-                    appendTerminalLine(`[Server Error] ${err.error || 'Unknown server error'}`, 'term-error-line');
-                }
-            } catch (err) {
-                appendTerminalLine(`[Network Error] Failed to connect to server: ${err.message}`, 'term-error-line');
-            } finally {
-                terminalInput.disabled = false;
-                btnExecute.disabled = false;
-                terminalInput.focus();
-                terminalScreen.scrollTop = terminalScreen.scrollHeight;
-            }
-        });
-
-        function appendTerminalLine(text, className) {
-            const line = document.createElement('div');
-            line.className = `term-line ${className}`;
-            line.textContent = text;
-            terminalScreen.appendChild(line);
-            terminalScreen.scrollTop = terminalScreen.scrollHeight;
-        }
-
         // Action Handlers
         btnTts.addEventListener('click', async () => {
             const text = ttsInput.value.trim();
@@ -1103,6 +939,131 @@
             }
         });
 
+        // Interactive WebTTY Terminal WebSocket Logic
+        let term = null;
+        let fitAddon = null;
+        let wsTerminal = null;
+        let pendingCommand = null;
+
+        async function initTerminal() {
+            // Already initialized? Just fit size
+            if (term !== null) {
+                setTimeout(() => {
+                    fitAddon.fit();
+                    if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
+                        wsTerminal.send(JSON.stringify({
+                            type: 'resize',
+                            rows: term.rows,
+                            cols: term.cols
+                        }));
+                    }
+                }, 50);
+                return;
+            }
+
+            // Create xterm instance
+            term = new Terminal({
+                cursorBlink: true,
+                theme: {
+                    background: '#020408',
+                    foreground: '#39ff14', // Matrix Green
+                    cursor: '#00f2fe'
+                },
+                fontFamily: 'Courier New, Courier, monospace',
+                fontSize: 14
+            });
+
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            
+            // Mount to HTML element
+            term.open(document.getElementById('terminal-container'));
+            
+            setTimeout(() => {
+                fitAddon.fit();
+            }, 50);
+
+            term.write('\x1b[33mRequesting secure one-time WebSocket token...\x1b[0m\r\n');
+
+            try {
+                // 1. Get temporary WebSocket token
+                const tokenRes = await fetch(`${API_URL}/api/token`, { method: 'POST' });
+                if (!tokenRes.ok) throw new Error('Auth token generation failed');
+                const tokenData = await tokenRes.json();
+                const token = tokenData.token;
+
+                term.write('\x1b[32mToken acquired. Connecting to terminal...\x1b[0m\r\n');
+
+                // 2. Open WebSocket
+                const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                const wsUrl = `${wsScheme}://${window.location.host}/ws/terminal?token=${token}`;
+                wsTerminal = new WebSocket(wsUrl);
+                wsTerminal.binaryType = 'arraybuffer';
+
+                wsTerminal.onopen = () => {
+                    term.write('\x1b[32mConnected successfully! Ready.\x1b[0m\r\n\r\n');
+                    
+                    // Send initial terminal size
+                    wsTerminal.send(JSON.stringify({
+                        type: 'resize',
+                        rows: term.rows,
+                        cols: term.cols
+                    }));
+
+                    // Execute any pending quick commands
+                    if (pendingCommand) {
+                        wsTerminal.send(JSON.stringify({
+                            type: 'input',
+                            data: pendingCommand
+                        }));
+                        pendingCommand = null;
+                    }
+                };
+
+                // Stream PTY stdout to xterm.js
+                wsTerminal.onmessage = (event) => {
+                    term.write(new Uint8Array(event.data));
+                };
+
+                wsTerminal.onclose = () => {
+                    term.write('\r\n\x1b[31m[Connection Closed by Host]\x1b[0m\r\n');
+                };
+
+                wsTerminal.onerror = (err) => {
+                    term.write('\r\n\x1b[31m[WebSocket Error]\x1b[0m\r\n');
+                    console.error('WS Error:', err);
+                };
+
+                // Send keypresses to PTY stdin
+                term.onData(data => {
+                    if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
+                        wsTerminal.send(JSON.stringify({
+                            type: 'input',
+                            data: data
+                        }));
+                    }
+                });
+
+                // Listen for window resize to adjust PTY rows/cols
+                window.addEventListener('resize', () => {
+                    if (term) {
+                        fitAddon.fit();
+                        if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
+                            wsTerminal.send(JSON.stringify({
+                                type: 'resize',
+                                rows: term.rows,
+                                cols: term.cols
+                            }));
+                        }
+                    }
+                });
+
+            } catch (err) {
+                term.write(`\r\n\x1b[31mFailed to launch WebTTY session: ${err.message}\x1b[0m\r\n`);
+                console.error(err);
+            }
+        }
+
         // Quick Action Buttons Elements
         const btnQuickSshStart = document.getElementById('btn-quick-ssh-start');
         const btnQuickSshStop = document.getElementById('btn-quick-ssh-stop');
@@ -1115,9 +1076,15 @@
             const termTabBtn = document.querySelector('.tab-btn[data-tab="terminal-pane"]');
             if (termTabBtn) termTabBtn.click();
 
-            // Run command
-            terminalInput.value = commandText;
-            terminalForm.dispatchEvent(new Event('submit'));
+            if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
+                wsTerminal.send(JSON.stringify({
+                    type: 'input',
+                    data: commandText + '\r'
+                }));
+            } else {
+                pendingCommand = commandText + '\r';
+                initTerminal();
+            }
         }
 
         btnQuickSshStart.addEventListener('click', () => {

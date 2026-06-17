@@ -22,12 +22,15 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty"
+	"github.com/gorilla/websocket"
 )
 
 //go:embed public/*
 var embedFS embed.FS
 
-const defaultPort = "8443" // Standard port for HTTPS is usually 443, we'll use 8443 by default
+const defaultPort = "8443"
 
 // Request/Response structs
 type BatteryInfo struct {
@@ -78,7 +81,7 @@ type IPApprovalState struct {
 	Waiters []chan bool
 }
 
-// Global state for IP confirmation and Auth
+// Global state for IP confirmation, Auth, and WS Tokens
 var (
 	approvedIPs      = make(map[string]time.Time)
 	pendingApprovals = make(map[string]*IPApprovalState)
@@ -86,7 +89,19 @@ var (
 
 	basicUser = "admin"
 	basicPass = "termux"
+
+	wsTokens      = make(map[string]time.Time)
+	wsTokensMutex sync.Mutex
 )
+
+// WebSocket Upgrader
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow LAN connections
+	},
+}
 
 func initAuth() {
 	if u := os.Getenv("DASHBOARD_USER"); u != "" {
@@ -105,7 +120,7 @@ func main() {
 		port = defaultPort
 	}
 
-	// 1. Generate SSL certificates if missing
+	// Generate SSL certificates if missing
 	if err := checkOrGenerateCert(); err != nil {
 		fmt.Printf("Error checking/generating SSL certificate: %v\n", err)
 		os.Exit(1)
@@ -113,12 +128,16 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// API Endpoints using Go 1.22+ method matching
+	// API Endpoints
 	mux.HandleFunc("GET /api/stats", handleStats)
 	mux.HandleFunc("POST /api/vibrate", handleVibrate)
 	mux.HandleFunc("POST /api/tts", handleTTS)
 	mux.HandleFunc("POST /api/toast", handleToast)
 	mux.HandleFunc("POST /api/execute", handleExecute)
+
+	// WebSocket / Token Endpoints
+	mux.HandleFunc("POST /api/token", handleGetToken)
+	mux.HandleFunc("GET /ws/terminal", handleTerminalWS)
 
 	// Static file handler (with local folder fallback)
 	mux.Handle("/", getStaticFileHandler())
@@ -143,12 +162,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			ip = r.RemoteAddr
 		}
 
-		// Check if proxied (e.g. through Cloudflare or reverse proxy)
+		// Check if proxied
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			ip = strings.Split(xff, ",")[0]
 		}
 
-		// Step A: Check Whitelist & Blacklist Access (Cheapest check)
+		// Step A: Check Whitelist & Blacklist Access
 		allowed, reason := checkIPAccess(ip)
 		if !allowed {
 			logBlockedAttempt(ip, r, reason)
@@ -157,13 +176,15 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Step B: Check HTTP Basic Authentication
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != basicUser || pass != basicPass {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Secure Termux Dashboard"`)
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("401 Unauthorized - Access Denied\n"))
-			return
+		// Step B: Check HTTP Basic Authentication (skip for WebSocket endpoint)
+		if r.URL.Path != "/ws/terminal" {
+			user, pass, ok := r.BasicAuth()
+			if !ok || user != basicUser || pass != basicPass {
+				w.Header().Set("WWW-Authenticate", `Basic realm="Secure Termux Dashboard"`)
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("401 Unauthorized - Access Denied\n"))
+				return
+			}
 		}
 
 		// Step C: Check Interactive Android Confirmation Dialog (Only for authenticated requests)
@@ -180,9 +201,125 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Check if the client IP is allowed based on whitelist.txt and blacklist.txt
+// Generate secure one-time WS token
+func generateWSToken() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	token := fmt.Sprintf("%x", b)
+
+	wsTokensMutex.Lock()
+	wsTokens[token] = time.Now().Add(15 * time.Second) // Valid for 15s
+	wsTokensMutex.Unlock()
+
+	return token
+}
+
+// Validate and consume WS token
+func validateWSToken(token string) bool {
+	wsTokensMutex.Lock()
+	defer wsTokensMutex.Unlock()
+
+	expiry, exists := wsTokens[token]
+	if !exists {
+		return false
+	}
+	delete(wsTokens, token) // One-time use
+
+	return time.Now().Before(expiry)
+}
+
+// Handlers for WebTTY WebSocket Shell
+func handleGetToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	token := generateWSToken()
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
+	// 1. Validate Token from Query URL
+	token := r.URL.Query().Get("token")
+	if !validateWSToken(token) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("Unauthorized - Invalid Token"))
+		return
+	}
+
+	// 2. Upgrade HTTP Connection to WebSocket
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Printf("WS Upgrade error: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	// 3. Start shell process with TTY (PTY)
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/data/data/com.termux/files/usr/bin/bash"
+		if _, err := os.Stat(shell); os.IsNotExist(err) {
+			shell = "sh"
+		}
+	}
+
+	c := exec.Command(shell)
+	c.Env = append(os.Environ(), "TERM=xterm-256color") // Enable full terminal ANSI render
+
+	f, err := pty.Start(c)
+	if err != nil {
+		fmt.Printf("PTY Start error: %v\n", err)
+		return
+	}
+	defer f.Close()
+	defer c.Process.Kill() // Ensure shell process dies on disconnect
+
+	// 4. Pipe PTY stdout/stderr -> WebSocket
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			n, err := f.Read(buf)
+			if err != nil {
+				// PTY read error (e.g. shell closed)
+				conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				return
+			}
+		}
+	}()
+
+	// 5. Pipe WebSocket -> PTY stdin
+	for {
+		var msg struct {
+			Type string `json:"type"`
+			Data string `json:"data,omitempty"`
+			Rows uint16 `json:"rows,omitempty"`
+			Cols uint16 `json:"cols,omitempty"`
+		}
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			break // WebSocket closed
+		}
+
+		switch msg.Type {
+		case "input":
+			// Write keypresses directly to shell
+			f.Write([]byte(msg.Data))
+		case "resize":
+			// Update terminal rows and columns size
+			pty.Setsize(f, &pty.Winsize{
+				Rows: msg.Rows,
+				Cols: msg.Cols,
+			})
+		}
+	}
+}
+
+// Check if client IP is blacklisted or whitelisted
 func checkIPAccess(clientIP string) (bool, string) {
-	// 1. Check Blacklist
+	// Check Blacklist
 	if blacklistBytes, err := os.ReadFile("blacklist.txt"); err == nil {
 		lines := strings.Split(string(blacklistBytes), "\n")
 		for _, line := range lines {
@@ -192,7 +329,7 @@ func checkIPAccess(clientIP string) (bool, string) {
 		}
 	}
 
-	// 2. Check Whitelist
+	// Check Whitelist
 	if whitelistBytes, err := os.ReadFile("whitelist.txt"); err == nil {
 		lines := strings.Split(string(whitelistBytes), "\n")
 		hasRules := false
@@ -218,7 +355,7 @@ func checkIPAccess(clientIP string) (bool, string) {
 	return true, ""
 }
 
-// Check interactive popup confirmation (with session caching)
+// Check interactive confirmation dialog
 func checkIPInteractive(clientIP string) (bool, string) {
 	// Localhost bypasses confirmation dialog
 	if clientIP == "127.0.0.1" || clientIP == "::1" || clientIP == "localhost" {
@@ -232,15 +369,13 @@ func checkIPInteractive(clientIP string) (bool, string) {
 		return true, ""
 	}
 
-	// Check if another request from the same IP is already prompting the user
+	// Check if pending
 	state, pending := pendingApprovals[clientIP]
 	if pending {
-		// Add ourselves as a waiter to avoid duplicate popups
 		ch := make(chan bool, 1)
 		state.Waiters = append(state.Waiters, ch)
 		approvalMutex.Unlock()
 		
-		// Wait for the prompt result
 		allowed := <-ch
 		if allowed {
 			return true, ""
@@ -248,7 +383,7 @@ func checkIPInteractive(clientIP string) (bool, string) {
 		return false, "Connection Rejected by User"
 	}
 
-	// We are the initiator of the confirmation dialog
+	// Create pending
 	state = &IPApprovalState{}
 	pendingApprovals[clientIP] = state
 	approvalMutex.Unlock()
@@ -260,22 +395,19 @@ func checkIPInteractive(clientIP string) (bool, string) {
 		exec.CommandContext(ctx, "termux-notification", "-t", "Dashboard Access Request", "-c", fmt.Sprintf("IP %s is trying to connect.", clientIP)).Run()
 	}()
 
-	// Show confirmation dialog (blocking)
+	// Ask confirmation (blocking)
 	allowed := askUserConfirmation(clientIP)
 
 	approvalMutex.Lock()
 	if allowed {
-		// Cache approved IP for 2 hours to prevent constant prompting
 		approvedIPs[clientIP] = time.Now().Add(2 * time.Hour)
 	}
 
-	// Notify all other waiting concurrent requests
 	for _, ch := range state.Waiters {
 		ch <- allowed
 		close(ch)
 	}
 
-	// Remove from pending list
 	delete(pendingApprovals, clientIP)
 	approvalMutex.Unlock()
 
@@ -287,14 +419,12 @@ func checkIPInteractive(clientIP string) (bool, string) {
 
 // Shows a dialog on the Android screen prompting the user to allow/deny access
 func askUserConfirmation(ip string) bool {
-	// Differentiate between "termux-dialog is missing" and "user timed out/denied"
 	_, err := exec.LookPath("termux-dialog")
 	if err != nil {
 		fmt.Printf("[WARNING] termux-dialog tidak ditemukan di PATH. Mengizinkan koneksi dari IP %s secara default.\n", ip)
 		return true
 	}
 
-	// Set timeout 30 detik untuk respon pengguna
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -306,7 +436,7 @@ func askUserConfirmation(ip string) bool {
 			return false
 		}
 		fmt.Printf("[WARNING] Gagal menjalankan termux-dialog: %v\n", err)
-		return false // Deny on error for safety
+		return false
 	}
 
 	var result struct {
@@ -314,7 +444,6 @@ func askUserConfirmation(ip string) bool {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(output, &result); err != nil {
-		// Fallback parse string manual jika format JSON berbeda
 		outStr := strings.ToLower(string(output))
 		return strings.Contains(outStr, "yes")
 	}
@@ -329,7 +458,6 @@ func ipMatchesLine(clientIPStr, line string) bool {
 		return false
 	}
 
-	// Try matching as CIDR subnet (e.g. 100.64.0.0/10)
 	if strings.Contains(line, "/") {
 		_, ipNet, err := net.ParseCIDR(line)
 		if err == nil {
@@ -340,13 +468,11 @@ func ipMatchesLine(clientIPStr, line string) bool {
 		}
 	}
 
-	// Fallback to exact IP string match
 	return clientIPStr == line
 }
 
 // Log connection IP and details to connections.log
 func logConnection(ip string, r *http.Request) {
-	// Skip logging stats polling to avoid bloating the log file
 	if r.URL.Path == "/api/stats" {
 		return
 	}
@@ -359,10 +485,8 @@ func logConnection(ip string, r *http.Request) {
 		r.Header.Get("User-Agent"),
 	)
 
-	// Print to console stdout
 	fmt.Print(logLine)
 
-	// Append to connections.log file
 	f, err := os.OpenFile("connections.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
 		defer f.Close()
@@ -381,10 +505,8 @@ func logBlockedAttempt(ip string, r *http.Request, reason string) {
 		r.Header.Get("User-Agent"),
 	)
 
-	// Print to console stdout
 	fmt.Print(logLine)
 
-	// Append to connections.log file
 	f, err := os.OpenFile("connections.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
 		defer f.Close()
@@ -397,22 +519,19 @@ func checkOrGenerateCert() error {
 	certFile := "cert.pem"
 	keyFile := "key.pem"
 
-	// Check if both files exist
 	_, err1 := os.Stat(certFile)
 	_, err2 := os.Stat(keyFile)
 	if err1 == nil && err2 == nil {
-		return nil // Files already exist
+		return nil
 	}
 
 	fmt.Println("SSL certificate files missing. Generating self-signed TLS certificates...")
 
-	// Generate private key
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return err
 	}
 
-	// Create certificate template
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -426,13 +545,12 @@ func checkOrGenerateCert() error {
 			CommonName:   "TermuxServer",
 		},
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(1, 0, 0), // 1 year validity
+		NotAfter:              time.Now().AddDate(1, 0, 0),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 	}
 
-	// Add local IPs to certificate (SANs)
 	template.IPAddresses = append(template.IPAddresses, net.ParseIP("127.0.0.1"), net.ParseIP("::1"))
 	ifaces, err := net.Interfaces()
 	if err == nil {
@@ -456,13 +574,11 @@ func checkOrGenerateCert() error {
 		}
 	}
 
-	// Create self-signed certificate bytes
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
 		return err
 	}
 
-	// Write cert.pem
 	certOut, err := os.Create(certFile)
 	if err != nil {
 		return err
@@ -470,7 +586,6 @@ func checkOrGenerateCert() error {
 	defer certOut.Close()
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
-	// Write key.pem
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
@@ -522,8 +637,7 @@ func handleTTS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Prevent huge body DOS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // Limit body size to 1MB
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	var payload TextPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -554,8 +668,7 @@ func handleToast(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// Prevent huge body DOS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // Limit body size to 1MB
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	var payload TextPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -591,8 +704,7 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prevent huge body DOS attacks
-	r.Body = http.MaxBytesReader(w, r.Body, 1048576) // Limit body size to 1MB
+	r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
 	var payload CommandPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -608,23 +720,19 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deteksi shell
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/data/data/com.termux/files/usr/bin/bash"
-		// Fallback jika bash tidak ada
 		if _, err := os.Stat(shell); os.IsNotExist(err) {
 			shell = "sh"
 		}
 	}
 
-	// Tambahkan timeout 30 detik untuk eksekusi perintah shell agar tidak hang selamanya
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, shell, "-c", command)
 	
-	// Saluran untuk membaca output gabungan (stdout dan stderr)
 	outputBytes, err := cmd.CombinedOutput()
 	outputStr := string(outputBytes)
 
@@ -655,7 +763,6 @@ func handleExecute(w http.ResponseWriter, r *http.Request) {
 func getBatteryInfo() BatteryInfo {
 	info := BatteryInfo{Status: "Unavailable", Health: "UNKNOWN", Plugged: "UNPLUGGED"}
 
-	// 1. Coba termux-battery-status
 	cmd := exec.Command("termux-battery-status")
 	if output, err := cmd.Output(); err == nil {
 		var result map[string]interface{}
@@ -679,14 +786,11 @@ func getBatteryInfo() BatteryInfo {
 		}
 	}
 
-	// 2. Fallback: Baca sysfs langsung
-	// Battery percentage
 	if content, err := os.ReadFile("/sys/class/power_supply/battery/capacity"); err == nil {
 		if val, err := strconv.Atoi(strings.TrimSpace(string(content))); err == nil {
 			info.Percentage = val
 		}
 	}
-	// Battery temperature (biasanya dalam persepuluh derajat C, misal 355 = 35.5)
 	if content, err := os.ReadFile("/sys/class/power_supply/battery/temp"); err == nil {
 		if val, err := strconv.ParseFloat(strings.TrimSpace(string(content)), 64); err == nil {
 			if val > 100 {
@@ -704,14 +808,12 @@ func getBatteryInfo() BatteryInfo {
 			}
 		}
 	}
-	// Battery status
 	if content, err := os.ReadFile("/sys/class/power_supply/battery/status"); err == nil {
 		info.Status = strings.TrimSpace(string(content))
 		if strings.ToLower(info.Status) == "charging" {
 			info.Plugged = "PLUGGED"
 		}
 	}
-	// Battery health
 	if content, err := os.ReadFile("/sys/class/power_supply/battery/health"); err == nil {
 		info.Health = strings.ToUpper(strings.TrimSpace(string(content)))
 	}
@@ -736,11 +838,11 @@ func getRAMInfo() RAMInfo {
 			continue
 		}
 		key := parts[0]
-		val, _ := strconv.Atoi(parts[1]) // dalam kB
+		val, _ := strconv.Atoi(parts[1])
 
 		switch key {
 		case "MemTotal:":
-			memTotal = val / 1024 // ke MB
+			memTotal = val / 1024
 		case "MemFree:":
 			memFree = val / 1024
 		case "MemAvailable:":
@@ -751,7 +853,6 @@ func getRAMInfo() RAMInfo {
 	info.Total = memTotal
 	info.Free = memFree
 	
-	// Jika MemAvailable tidak ditemukan di kernel lama, fallback ke MemFree
 	if memAvailable == 0 {
 		info.Available = memFree
 	} else {
@@ -766,10 +867,8 @@ func getStorageInfo() StorageInfo {
 	info := StorageInfo{Size: "0", Used: "0", Avail: "0", Percent: "0%"}
 
 	var stat syscall.Statfs_t
-	// /data adalah partisi user space utama di Android
 	err := syscall.Statfs("/data", &stat)
 	if err != nil {
-		// Fallback ke root jika /data bermasalah
 		err = syscall.Statfs("/", &stat)
 	}
 
@@ -779,7 +878,6 @@ func getStorageInfo() StorageInfo {
 		avail := stat.Bavail * uint64(stat.Bsize)
 		used := total - free
 
-		// Format ke GB
 		totalGB := float64(total) / (1024 * 1024 * 1024)
 		usedGB := float64(used) / (1024 * 1024 * 1024)
 		availGB := float64(avail) / (1024 * 1024 * 1024)
@@ -799,13 +897,11 @@ func getStorageInfo() StorageInfo {
 }
 
 func getUptimeInfo() string {
-	// Coba jalankan uptime
 	cmd := exec.Command("uptime")
 	if output, err := cmd.Output(); err == nil {
 		return strings.TrimSpace(string(output))
 	}
 
-	// Fallback: baca /proc/uptime
 	content, err := os.ReadFile("/proc/uptime")
 	if err != nil {
 		return "Unavailable"
@@ -823,9 +919,7 @@ func getUptimeInfo() string {
 	return "Unavailable"
 }
 
-// HTTP File serving with local fallback
 func getStaticFileHandler() http.Handler {
-	// Cek apakah ada folder lokal public/index.html
 	wd, _ := os.Getwd()
 	localIndex := filepath.Join(wd, "public", "index.html")
 	if _, err := os.Stat(localIndex); err == nil {
@@ -833,7 +927,6 @@ func getStaticFileHandler() http.Handler {
 		return http.FileServer(http.Dir("public"))
 	}
 
-	// Fallback ke embedFS
 	fmt.Println("Serving static files from embedded asset system.")
 	subFS, err := fs.Sub(embedFS, "public")
 	if err != nil {
@@ -846,17 +939,15 @@ func printStartupInfo(port string) {
 	fmt.Println("\n==================================================")
 	fmt.Println("🔒 SECURE TERMUX SYSTEM DASHBOARD (GO SSL ENGINE)")
 	fmt.Println("==================================================")
-	fmt.Println("Dashboard successfully loaded in HTTPS mode.")
+	fmt.Println("Dashboard successfully loaded in HTTPS mode with WebTTY.")
 	fmt.Println("\nLocal Access:")
 	fmt.Printf("   👉 https://localhost:%s\n", port)
 
-	// List IP Addresses
 	fmt.Println("\nNetwork Access (Wi-Fi/Tailscale):")
 	ifaces, err := net.Interfaces()
 	if err == nil {
 		count := 0
 		for _, iface := range ifaces {
-			// Lewati interface non-aktif/loopback
 			if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 				continue
 			}
@@ -877,7 +968,7 @@ func printStartupInfo(port string) {
 				}
 				ip = ip.To4()
 				if ip == nil {
-					continue // skip IPv6
+					continue
 				}
 				fmt.Printf("   👉 https://%s:%s\n", ip.String(), port)
 				count++
