@@ -1,6 +1,6 @@
 # Termux System Dashboard & Remote Console (Go SSL Engine)
 
-Aplikasi web dashboard sistem untuk Termux Android yang dikembangkan menggunakan **Go (Golang)** berkinerja tinggi. Dashboard ini menampilkan statistik hardware secara real-time, mengizinkan pemicuan fitur diagnostik ponsel, serta memiliki **Remote Terminal** terintegrasi yang aman untuk mengontrol Termux dari jarak jauh menggunakan enkripsi SSL/TLS.
+Aplikasi web dashboard sistem untuk Termux Android yang dikembangkan menggunakan **Go (Golang)** berkinerja tinggi. Dashboard ini menampilkan statistik hardware secara real-time, mengizinkan penjelajahan berkas, pemantauan sistem, pemicuan API perangkat Android (kamera, lokasi, SMS), serta memiliki **Interactive WebTTY (Terminal)** terintegrasi yang aman untuk mengontrol Termux dari jarak jauh menggunakan enkripsi SSL/TLS.
 
 ---
 
@@ -10,21 +10,25 @@ Aplikasi web dashboard sistem untuk Termux Android yang dikembangkan menggunakan
 2. **Single-Binary Execution**: Seluruh file HTML/CSS/JS dibundel ke dalam file biner `dashboard` (~9.8MB) menggunakan fitur Go `embed`. Anda dapat menjalankan binary ini di mana saja tanpa folder `public` eksternal.
 3. **HTTPS / SSL Encrypted**: Komunikasi data dienkripsi menggunakan protokol HTTPS (TLS) secara bawaan. Sertifikat SSL *self-signed* (`cert.pem` & `key.pem`) akan dibuat otomatis saat server pertama kali dijalankan.
 4. **HTTP Basic Authentication**: Melindungi dashboard dari akses luar menggunakan login Username & Password.
-5. **Remote Terminal Console**: Antarmuka CLI monospaced retro untuk mengirim dan menjalankan command shell Termux langsung dari browser.
-6. **Quick Shell Actions**: Kartu kendali cepat di dashboard untuk menjalankan aksi penting seperti menyalakan/mematikan server SSH (`sshd`), melihat proses yang berjalan (`top`), dan menampilkan berkas penyimpanan (`ls`).
-7. **Logger Riwayat Koneksi**: Setiap koneksi dari IP luar secara otomatis dicatat ke `connections.log` untuk monitoring keamanan.
-8. **Sistem Keamanan IP (Whitelist & Blacklist)**: Membatasi akses dashboard hanya untuk IP tertentu menggunakan file konfigurasi eksternal.
-9. **Otorisasi Interaktif (Notifikasi & Konfirmasi)**: Menampilkan notifikasi Android dan dialog konfirmasi (Yes/No) di layar ponsel ketika perangkat baru mencoba terhubung (hanya setelah lolos login Basic Auth).
+5. **Interactive WebTTY**: Konsol terminal interaktif berbasis WebSockets dan `xterm.js` yang terhubung langsung ke shell PTY (`/data/data/com.termux/files/usr/bin/bash` atau `sh`). Mendukung penyesuaian ukuran layout dinamis (seperti menjalankan `nano`, `htop`, dll).
+6. **File Explorer (Penjelajah Berkas)**: Menjelajahi file sistem Termux langsung dari web, mendukung navigasi folder, unduh berkas, hapus berkas, dan unggah berkas (hingga ukuran 50MB via Multipart Upload).
+7. **Android Hardware Integration (`termux-api`)**:
+   - **Kamera HP**: Mengambil foto secara langsung menggunakan kamera utama/belakang perangkat Android (`termux-camera-photo`) dan menampilkan hasilnya langsung di dashboard.
+   - **GPS Tracker**: Mendapatkan informasi koordinat lokasi (Latitude, Longitude, Altitude, Akurasi) menggunakan `termux-location` dan menampilkannya secara interaktif pada peta Leaflet.js.
+   - **SMS Reader**: Membaca dan menampilkan daftar 5 SMS masuk terakhir dari perangkat menggunakan `termux-sms-list`.
+8. **Logger Riwayat Koneksi**: Setiap koneksi dari IP luar secara otomatis dicatat ke `connections.log` untuk monitoring keamanan.
+9. **Sistem Keamanan IP (Whitelist & Blacklist)**: Membatasi akses dashboard hanya untuk IP tertentu menggunakan file konfigurasi eksternal (`whitelist.txt` dan `blacklist.txt`).
+10. **Otorisasi Interaktif (Notifikasi & Konfirmasi)**: Menampilkan notifikasi Android dan dialog konfirmasi (Yes/No) di layar ponsel ketika perangkat baru mencoba terhubung (hanya setelah lolos login Basic Auth).
 
 ---
 
 ## 📂 Struktur Berkas
 
-- `main.go` — Kode backend server HTTP Go, handler API, dan logger.
+- `main.go` — Kode backend server HTTP Go, handler API, WebTTY, dan integrasi Android API.
 - `public/index.html` — Berkas frontend statis (HTML/CSS/JS).
 - `dashboard` — Executable biner hasil kompilasi.
 - `cert.pem` & `key.pem` — Sertifikat SSL untuk enkripsi HTTPS (dibuat otomatis).
-- `connections.log` — File log pencatatan riwayat IP yang mengakses dashboard.
+- `connections.log` — File log pencatatan riwayat IP yang mengakses dashboard (dibuat otomatis).
 - `whitelist.txt` — Daftar IP/Subnet yang diizinkan masuk.
 - `blacklist.txt` — Daftar IP/Subnet yang diblokir masuk.
 
@@ -55,7 +59,29 @@ Sistem memproses keamanan dalam 3 tahap:
 
 ---
 
+## 🔌 API Endpoints Reference
+
+### File Manager APIs
+* **`GET /api/files/list?path=<dir>`**: Mengambil daftar file dan folder pada path yang ditentukan (default `.`).
+* **`GET /api/files/download?path=<file>`**: Mengunduh berkas terpilih dari Termux ke client.
+* **`POST /api/files/upload?path=<dir>`**: Mengunggah file ke direktori tujuan (Multipart Form, batas maks 50MB).
+* **`POST /api/files/delete`**: Menghapus file/folder (Body: JSON `{"path": "<target_path>"}`).
+
+### Android Hardware APIs (Memerlukan `termux-api`)
+* **`POST /api/android/photo`**: Menjepret foto menggunakan kamera utama perangkat (kamera belakang ID 0).
+* **`GET /api/android/photo/view`**: Menampilkan atau mengunduh hasil foto terakhir (`captured_temp.jpg`).
+* **`GET /api/android/location`**: Meminta koordinat GPS terkini dari satelit/jaringan ponsel.
+* **`GET /api/android/sms`**: Membaca daftar pesan teks masuk terkini.
+
+---
+
 ## 🚀 Cara Menjalankan & Menghentikan Dashboard
+
+### Prasyarat
+Untuk menggunakan fitur Android Hardware Integration (Kamera, Lokasi, SMS, Vibrate, TTS, dll), pastikan aplikasi **Termux:API** terinstal dari F-Droid dan paket API terpasang di dalam terminal:
+```bash
+pkg install termux-api
+```
 
 ### 1. Menjalankan di Depan Layar (Foreground)
 ```bash
@@ -74,15 +100,3 @@ nohup ./dashboard > /dev/null 2>&1 &
 ```bash
 pkill dashboard
 ```
-
----
-
-## 🎛️ Fitur Quick Shell Actions
-
-Pada halaman depan dashboard, terdapat kartu **Quick Shell Actions** yang dapat Anda ketuk untuk mengeksekusi perintah penting secara cepat:
-* **Start SSH Server (sshd)**: Menyalakan server SSH di Termux agar Anda bisa login dari PC menggunakan SSH client.
-* **Stop SSH Server**: Mematikan semua proses server SSH (`sshd`).
-* **Monitor Active Processes**: Menampilkan daftar 15 proses teratas yang memakan memori/CPU di Termux Anda.
-* **List Storage Files**: Menampilkan isi direktori penyimpanan Anda saat ini (`ls -lh`).
-
-*Setiap kali tombol diketuk, aplikasi akan otomatis memindahkan Anda ke tab **Terminal** dan mengalirkan keluaran perintah secara real-time.*
