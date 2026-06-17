@@ -140,6 +140,7 @@ func releaseWakeLock() {
 }
 
 func initAuth() {
+	var isGenerated bool
 	if u := os.Getenv("DASHBOARD_USER"); u != "" {
 		basicUser = u
 	}
@@ -150,17 +151,80 @@ func initAuth() {
 		b := make([]byte, 8)
 		if _, err := rand.Read(b); err == nil {
 			basicPass = fmt.Sprintf("%x", b)
+			isGenerated = true
 			fmt.Printf("\n[SECURITY] DASHBOARD_PASSWORD tidak diatur. Membuat password acak sekali pakai:\n")
 			fmt.Printf("           Password: %s\n\n", basicPass)
 		} else {
 			basicPass = "termux" // Fallback
 		}
 	}
+
+	// Salin password ke clipboard Android menggunakan termux-clipboard-set jika tersedia
+	if _, err := exec.LookPath("termux-clipboard-set"); err == nil {
+		if err := exec.Command("termux-clipboard-set", basicPass).Run(); err == nil {
+			if isGenerated {
+				fmt.Printf("[INFO] Password acak sekali pakai telah disalin ke clipboard Android.\n")
+			} else {
+				fmt.Printf("[INFO] Password admin telah disalin ke clipboard Android.\n")
+			}
+		}
+	}
+}
+
+func watchSystemMetrics(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+
+	var batteryAlertSent bool
+	var storageAlertSent bool
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Check battery temperature
+			bat := getBatteryInfo()
+			if bat.Temperature >= 45.0 {
+				if !batteryAlertSent {
+					sendNotification("⚠️ Baterai Panas!", fmt.Sprintf("Suhu baterai HP Anda mencapai %.1f°C.", bat.Temperature))
+					batteryAlertSent = true
+				}
+			} else {
+				batteryAlertSent = false
+			}
+
+			// Check storage
+			storage := getStorageInfo()
+			pctStr := strings.TrimSuffix(storage.Percent, "%")
+			if pct, err := strconv.Atoi(pctStr); err == nil {
+				if pct >= 95 { // Storage > 95% used
+					if !storageAlertSent {
+						sendNotification("⚠️ Penyimpanan Penuh!", fmt.Sprintf("Penyimpanan internal hampir habis: %s terpakai (%s tersisa).", storage.Percent, storage.Avail))
+						storageAlertSent = true
+					}
+				} else {
+					storageAlertSent = false
+				}
+			}
+		}
+	}
+}
+
+func sendNotification(title, content string) {
+	_, err := exec.LookPath("termux-notification")
+	if err == nil {
+		exec.Command("termux-notification", "--id", "dashboard-alert", "--title", title, "--content", content).Run()
+	}
 }
 
 func main() {
 	initAuth()
 	acquireWakeLock()
+
+	metricsCtx, metricsCancel := context.WithCancel(context.Background())
+	defer metricsCancel()
+	go watchSystemMetrics(metricsCtx)
 
 	port := os.Getenv("PORT")
 	if port == "" {

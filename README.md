@@ -1,7 +1,5 @@
 # Termux System Dashboard & Remote Console
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfungsi menampilkan metrik perangkat, mengelola file, mengeksekusi perintah diagnostik cepat, dan menyediakan akses terminal remote terenkripsi SSL/TLS.
 
 ![Preview](preview.jpg)
@@ -127,9 +125,3 @@ nohup ./dashboard > /dev/null 2>&1 &
 ```bash
 pkill dashboard
 ```
-
----
-
-## Lisensi
-
-Proyek ini dilisensikan di bawah [Lisensi MIT](LICENSE).
