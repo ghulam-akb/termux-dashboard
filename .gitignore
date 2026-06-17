@@ -1,0 +1,14 @@
+# Compiled binary
+dashboard
+
+# SSL certificates (private keys and certs)
+cert.pem
+key.pem
+
+# Local configuration lists and logs
+connections.log
+whitelist.txt
+blacklist.txt
+
+# OS-specific files
+.DS_Store

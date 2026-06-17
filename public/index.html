@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termux Glassmorphism Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: rgba(0, 0, 0, 0.3);
+            
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --purple: #bf55ec;
+            --success: #00e676;
+            --warning: #ffb300;
+            --danger: #ff1744;
+            --text: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 10% 10%, rgba(191, 85, 236, 0.15) 0px, transparent 50%),
+                radial-gradient(at 90% 10%, rgba(79, 172, 254, 0.15) 0px, transparent 50%),
+                radial-gradient(at 50% 90%, rgba(0, 242, 254, 0.1) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            padding: 2.5rem 1.5rem 1rem;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo i {
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.4));
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(135deg, var(--text), var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            background: rgba(0, 230, 118, 0.1);
+            border: 1px solid rgba(0, 230, 118, 0.2);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 0 15px rgba(0, 230, 118, 0.1);
+            animation: pulse-glow 2s infinite alternate;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        /* Glassmorphism Card Style */
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(16px) saturate(120%);
+            -webkit-backdrop-filter: blur(16px) saturate(120%);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px var(--glass-shadow);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -50%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(
+                90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.03), 
+                transparent
+            );
+            transform: skewX(-15deg);
+            transition: 0.75s;
+            pointer-events: none;
+        }
+
+        .card:hover::before {
+            left: 120%;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-title i {
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+
+        /* Circular Progress Ring */
+        .circle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            margin: 1.5rem 0;
+        }
+
+        .circular-progress {
+            position: relative;
+            height: 160px;
+            width: 160px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary) 0%, #1e293b 0%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.5s ease;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .circular-progress::before {
+            content: "";
+            position: absolute;
+            height: 130px;
+            width: 130px;
+            border-radius: 50%;
+            background-color: #0e1322;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .progress-value {
+            position: relative;
+            font-size: 2.25rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, var(--text-muted));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Stats Details Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            padding: 1rem;
+            border-radius: 16px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        /* Progress Bar (Linear) */
+        .linear-progress-container {
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        .bar-label-container {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.05);
+            height: 10px;
+            border-radius: 50px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(90deg, var(--secondary), var(--primary));
+            height: 100%;
+            width: 0%;
+            border-radius: 50px;
+            transition: width 0.8s cubic-bezier(0.1, 0.8, 0.3, 1);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+        }
+
+        /* Control Form Panel */
+        .control-group {
+            margin-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .control-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            padding: 0.85rem 1.25rem;
+            border-radius: 14px;
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+            border: none;
+            color: #0b0f19;
+            padding: 0.85rem 1.5rem;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 242, 254, 0.35);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.btn-block {
+            width: 100%;
+            padding: 1rem;
+            margin-top: 0.5rem;
+            background: linear-gradient(135deg, #a855f7 0%, var(--purple) 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(191, 85, 236, 0.2);
+        }
+
+        button.btn-block:hover {
+            box-shadow: 0 6px 20px rgba(191, 85, 236, 0.35);
+        }
+
+        /* Toast Popup Notification */
+        .web-toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(11, 15, 25, 0.85);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(12px);
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 1000;
+            transform: translateY(150%);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .web-toast.show {
+            transform: translateY(0);
+        }
+
+        .web-toast.success i { color: var(--success); }
+        .web-toast.error i { color: var(--danger); }
+
+        footer {
+            text-align: center;
+            padding: 2.5rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        /* Keyframe Animations */
+        @keyframes pulse-glow {
+            0% {
+                box-shadow: 0 0 10px rgba(0, 230, 118, 0.05);
+            }
+            100% {
+                box-shadow: 0 0 20px rgba(0, 230, 118, 0.25);
+            }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1.25rem;
+                padding-top: 1.5rem;
+                text-align: center;
+            }
+            main {
+                padding: 1rem;
+                gap: 1.5rem;
+            }
+            .card {
+                padding: 1.5rem;
+            }
+        }
+
+        /* Tab Navigation */
+        .tabs-nav {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            padding: 0.35rem;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.03);
+            transform: none;
+            box-shadow: none;
+            filter: none;
+        }
+
+        .tab-btn.active {
+            color: #0b0f19;
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+            box-shadow: 0 4px 12px rgba(0, 242, 254, 0.2);
+        }
+
+        /* Pane Visibility */
+        .tab-pane {
+            display: none;
+            width: 100%;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-pane.active-pane {
+            display: block;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            width: 100%;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Terminal Tab Styles */
+        .terminal-card {
+            background: rgba(5, 8, 16, 0.75);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background-color: #ff5f56; }
+        .dot-yellow { background-color: #ffbd2e; }
+        .dot-green { background-color: #27c93f; }
+
+        .terminal-title {
+            font-size: 0.85rem;
+            font-family: monospace;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .terminal-screen {
+            flex: 1;
+            background: #020408;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1.25rem;
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #39ff14; /* Matrix Green */
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+
+        .terminal-screen::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .terminal-screen::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .terminal-screen::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .terminal-screen::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .term-line {
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .term-input-line {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .term-output-line {
+            color: #e2e8f0;
+            padding-left: 0.5rem;
+        }
+
+        .term-error-line {
+            color: var(--danger);
+            padding-left: 0.5rem;
+        }
+
+        .term-system-line {
+            color: var(--warning);
+            font-style: italic;
+        }
+
+        .terminal-footer-form {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .term-prompt {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+
+        .term-cmd-input {
+            flex: 1;
+            background: #020408;
+            border: 1px solid var(--glass-border);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            color: #39ff14;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .term-cmd-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+        }
+
+        .term-btn-exec {
+            background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+            border: none;
+            color: #0b0f19;
+            padding: 0.75rem 1.25rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0, 242, 254, 0.2);
+        }
+
+        .term-btn-exec:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 242, 254, 0.35);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+            <h1>TERMUX DASHBOARD</h1>
+        </div>
+        
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="dashboard-pane"><i class="fa-solid fa-chart-simple"></i> Status</button>
+            <button class="tab-btn" data-tab="terminal-pane"><i class="fa-solid fa-terminal"></i> Terminal</button>
+        </nav>
+
+        <div class="status-badge" id="online-status">Connected</div>
+    </header>
+
+    <main>
+        <!-- Tab 1: Dashboard Stats -->
+        <div id="dashboard-pane" class="tab-pane active-pane">
+            <div class="grid-container">
+                <!-- Card 1: Battery -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-battery-three-quarters"></i>
+                            Battery Status
+                        </div>
+                    </div>
+                    <div class="circle-container">
+                        <div class="circular-progress" id="battery-progress">
+                            <span class="progress-value" id="battery-percent">0%</span>
+                        </div>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-label">Temperature</div>
+                            <div class="stat-val" id="battery-temp">0.0°C</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Health</div>
+                            <div class="stat-val" id="battery-health">UNKNOWN</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Plugged</div>
+                            <div class="stat-val" id="battery-plugged">UNKNOWN</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Status</div>
+                            <div class="stat-val" id="battery-status">UNKNOWN</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Memory & Storage -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-microchip"></i>
+                            System Resources
+                        </div>
+                    </div>
+                    
+                    <!-- RAM Progress Bar -->
+                    <div class="linear-progress-container">
+                        <div class="bar-label-container">
+                            <span>RAM Memory</span>
+                            <span id="ram-text">0 MB / 0 MB (0%)</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="ram-fill"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage Progress Bar -->
+                    <div class="linear-progress-container" style="margin-top: 1.75rem;">
+                        <div class="bar-label-container">
+                            <span>System Storage (/data)</span>
+                            <span id="storage-text">0 GB / 0 GB (0%)</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="storage-fill" style="background: linear-gradient(90deg, var(--purple), var(--primary))"></div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid" style="margin-top: 2rem;">
+                        <div class="stat-item" style="grid-column: span 2;">
+                            <div class="stat-label">Uptime & Load Average</div>
+                            <div class="stat-val" id="uptime-val" style="font-size: 0.95rem; font-weight: 400; padding: 0.25rem 0;">Loading uptime...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Remote Control Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-sliders"></i>
+                            Device Commands
+                        </div>
+                    </div>
+
+                    <!-- Action 1: Text to Speech -->
+                    <div class="control-group">
+                        <label for="tts-input">Text-To-Speech (Speak Out Loud)</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="tts-input" placeholder="Ketik sesuatu untuk diucapkan..." value="Halo bos, apa kabar?">
+                            <button id="btn-tts"><i class="fa-solid fa-volume-high"></i> Speak</button>
+                        </div>
+                    </div>
+
+                    <!-- Action 2: Toast Alert -->
+                    <div class="control-group">
+                        <label for="toast-input">Toast Popup Alert</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="toast-input" placeholder="Pesan untuk Android Toast popup..." value="Hello from Dashboard!">
+                            <button id="btn-toast"><i class="fa-solid fa-comment-dots"></i> Send</button>
+                        </div>
+                    </div>
+
+                    <!-- Action 3: Vibrate -->
+                    <div class="control-group" style="margin-top: 1.5rem;">
+                        <label>Phone Diagnostics</label>
+                        <button class="btn-block" id="btn-vibrate"><i class="fa-solid fa-waveform-lines"></i> Vibrate Device</button>
+                    </div>
+                </div>
+
+                <!-- Card 4: Quick Shell Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-square-poll-horizontal"></i>
+                            Quick Shell Actions
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-top: 1.25rem;">
+                        <button class="btn-block" id="btn-quick-ssh-start" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-key"></i> Start SSH Server (sshd)
+                        </button>
+                        <button class="btn-block" id="btn-quick-ssh-stop" style="background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-lock"></i> Stop SSH Server
+                        </button>
+                        <button class="btn-block" id="btn-quick-processes" style="background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-list-check"></i> Monitor Active Processes
+                        </button>
+                        <button class="btn-block" id="btn-quick-ls" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); margin-top: 0; padding: 0.85rem;">
+                            <i class="fa-solid fa-folder-open"></i> List Storage Files (ls -lh)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Remote Terminal -->
+        <div id="terminal-pane" class="tab-pane">
+            <div class="terminal-card">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <span class="terminal-dot dot-red"></span>
+                        <span class="terminal-dot dot-yellow"></span>
+                        <span class="terminal-dot dot-green"></span>
+                    </div>
+                    <div class="terminal-title">bash - termux@android</div>
+                    <div style="width: 40px;"></div>
+                </div>
+                <div class="terminal-screen" id="terminal-screen">
+                    <div class="term-line term-system-line">Welcome to Termux Remote Console (Go Engine)</div>
+                    <div class="term-line term-system-line">Ready to execute commands...</div>
+                </div>
+                <form class="terminal-footer-form" id="terminal-form">
+                    <span class="term-prompt">~ $</span>
+                    <input type="text" class="term-cmd-input" id="terminal-input" placeholder="Ketik perintah (contoh: ls, top, pkg help, uptime)..." autocomplete="off">
+                    <button type="submit" class="term-btn-exec" id="btn-execute">
+                        <i class="fa-solid fa-play"></i> Run
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Termux Dashboard &copy; 2026. Made with Glassmorphism Design.</p>
+    </footer>
+
+    <!-- UI Toast Element -->
+    <div class="web-toast" id="ui-toast">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="ui-toast-msg">Notification Message</span>
+    </div>
+
+    <script>
+        const API_URL = ''; // Local server APIs
+
+        // Elements
+        const batteryProgress = document.getElementById('battery-progress');
+        const batteryPercentText = document.getElementById('battery-percent');
+        const batteryTempText = document.getElementById('battery-temp');
+        const batteryHealthText = document.getElementById('battery-health');
+        const batteryPluggedText = document.getElementById('battery-plugged');
+        const batteryStatusText = document.getElementById('battery-status');
+
+        const ramText = document.getElementById('ram-text');
+        const ramFill = document.getElementById('ram-fill');
+        const storageText = document.getElementById('storage-text');
+        const storageFill = document.getElementById('storage-fill');
+        const uptimeVal = document.getElementById('uptime-val');
+
+        const ttsInput = document.getElementById('tts-input');
+        const btnTts = document.getElementById('btn-tts');
+        const toastInput = document.getElementById('toast-input');
+        const btnToast = document.getElementById('btn-toast');
+        const btnVibrate = document.getElementById('btn-vibrate');
+        const onlineStatus = document.getElementById('online-status');
+
+        // Terminal Elements
+        const terminalScreen = document.getElementById('terminal-screen');
+        const terminalForm = document.getElementById('terminal-form');
+        const terminalInput = document.getElementById('terminal-input');
+        const btnExecute = document.getElementById('btn-execute');
+
+        // Tab Switching Logic
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.getAttribute('data-tab');
+
+                // Remove active classes
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanes.forEach(pane => pane.classList.remove('active-pane'));
+
+                // Add active classes
+                button.classList.add('active');
+                const activePane = document.getElementById(targetTab);
+                if (activePane) {
+                    activePane.classList.add('active-pane');
+                    if (targetTab === 'terminal-pane') {
+                        terminalInput.focus();
+                    }
+                }
+            });
+        });
+
+        // Toast Helper
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('ui-toast');
+            const msgSpan = document.getElementById('ui-toast-msg');
+            const icon = toast.querySelector('i');
+            
+            toast.className = 'web-toast show ' + type;
+            msgSpan.innerText = message;
+
+            if (type === 'success') {
+                icon.className = 'fa-solid fa-circle-check';
+            } else {
+                icon.className = 'fa-solid fa-circle-exclamation';
+            }
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Fetch API Stats
+        async function fetchStats() {
+            try {
+                const res = await fetch(`${API_URL}/api/stats`);
+                if (!res.ok) throw new Error('API server issue');
+                const data = await res.json();
+                
+                updateUI(data);
+                onlineStatus.innerText = 'Connected';
+                onlineStatus.style.color = 'var(--success)';
+                onlineStatus.style.background = 'rgba(0, 230, 118, 0.1)';
+                onlineStatus.style.borderColor = 'rgba(0, 230, 118, 0.2)';
+            } catch (err) {
+                console.error(err);
+                onlineStatus.innerText = 'Disconnected';
+                onlineStatus.style.color = 'var(--danger)';
+                onlineStatus.style.background = 'rgba(255, 23, 68, 0.1)';
+                onlineStatus.style.borderColor = 'rgba(255, 23, 68, 0.2)';
+            }
+        }
+
+        // Update UI Dashboard
+        function updateUI(data) {
+            // 1. Battery
+            const battery = data.battery || {};
+            const percent = battery.percentage || 0;
+            
+            // Set battery progress colors and circular background gradient
+            let batteryColor = 'var(--success)';
+            if (percent < 20) batteryColor = 'var(--danger)';
+            else if (percent < 50) batteryColor = 'var(--warning)';
+
+            batteryPercentText.innerText = `${percent}%`;
+            batteryProgress.style.background = `conic-gradient(${batteryColor} ${percent}%, #1e293b ${percent}%)`;
+            
+            // Temperature conversion
+            let rawTemp = battery.temperature || 0;
+            let formattedTemp = rawTemp > 100 ? (rawTemp / 10).toFixed(1) : parseFloat(rawTemp).toFixed(1);
+            batteryTempText.innerText = `${formattedTemp}°C`;
+            
+            batteryHealthText.innerText = battery.health || 'UNKNOWN';
+            batteryPluggedText.innerText = battery.plugged || 'UNPLUGGED';
+            batteryStatusText.innerText = battery.status || 'UNKNOWN';
+
+            // 2. RAM Memory
+            const ram = data.ram || {};
+            if (ram.total > 0) {
+                const ramPercent = Math.round((ram.used / ram.total) * 100);
+                ramText.innerText = `${ram.used} MB / ${ram.total} MB (${ramPercent}%)`;
+                ramFill.style.width = `${ramPercent}%`;
+            } else {
+                ramText.innerText = 'Unavailable';
+                ramFill.style.width = '0%';
+            }
+
+            // 3. Storage
+            const storage = data.storage || {};
+            if (storage.size !== '0') {
+                const percentStr = storage.percent || '0%';
+                storageText.innerText = `${storage.used} / ${storage.size} (${percentStr})`;
+                storageFill.style.width = percentStr;
+            } else {
+                storageText.innerText = 'Unavailable';
+                storageFill.style.width = '0%';
+            }
+
+            // 4. Uptime
+            uptimeVal.innerText = data.uptime || 'Unavailable';
+        }
+
+        // Terminal Execution Logic
+        terminalForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const command = terminalInput.value.trim();
+            if (!command) return;
+
+            // Clear input
+            terminalInput.value = '';
+
+            // Print command to screen
+            appendTerminalLine(`~ $ ${command}`, 'term-input-line');
+
+            // Disable UI
+            terminalInput.disabled = true;
+            btnExecute.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.output) {
+                        appendTerminalLine(data.output, 'term-output-line');
+                    }
+                    if (data.error) {
+                        appendTerminalLine(`[Error] ${data.error}`, 'term-error-line');
+                    }
+                    if (data.exitCode !== 0) {
+                        appendTerminalLine(`Process exited with code ${data.exitCode}`, 'term-system-line');
+                    }
+                } else {
+                    const err = await res.json();
+                    appendTerminalLine(`[Server Error] ${err.error || 'Unknown server error'}`, 'term-error-line');
+                }
+            } catch (err) {
+                appendTerminalLine(`[Network Error] Failed to connect to server: ${err.message}`, 'term-error-line');
+            } finally {
+                terminalInput.disabled = false;
+                btnExecute.disabled = false;
+                terminalInput.focus();
+                terminalScreen.scrollTop = terminalScreen.scrollHeight;
+            }
+        });
+
+        function appendTerminalLine(text, className) {
+            const line = document.createElement('div');
+            line.className = `term-line ${className}`;
+            line.textContent = text;
+            terminalScreen.appendChild(line);
+            terminalScreen.scrollTop = terminalScreen.scrollHeight;
+        }
+
+        // Action Handlers
+        btnTts.addEventListener('click', async () => {
+            const text = ttsInput.value.trim();
+            if (!text) return;
+            btnTts.disabled = true;
+            try {
+                const res = await fetch(`${API_URL}/api/tts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                if (res.ok) {
+                    showToast('TTS command sent to phone successfully!');
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to trigger TTS', 'error');
+                }
+            } catch (err) {
+                showToast('Network error while running TTS', 'error');
+            } finally {
+                btnTts.disabled = false;
+            }
+        });
+
+        btnToast.addEventListener('click', async () => {
+            const text = toastInput.value.trim();
+            if (!text) return;
+            btnToast.disabled = true;
+            try {
+                const res = await fetch(`${API_URL}/api/toast`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+                if (res.ok) {
+                    showToast('Toast alert displayed on device!');
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to trigger Toast', 'error');
+                }
+            } catch (err) {
+                showToast('Network error while sending Toast', 'error');
+            } finally {
+                btnToast.disabled = false;
+            }
+        });
+
+        btnVibrate.addEventListener('click', async () => {
+            btnVibrate.disabled = true;
+            try {
+                const res = await fetch(`${API_URL}/api/vibrate`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    showToast('Device vibrated successfully!');
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Failed to vibrate device', 'error');
+                }
+            } catch (err) {
+                showToast('Network error while sending Vibrate command', 'error');
+            } finally {
+                btnVibrate.disabled = false;
+            }
+        });
+
+        // Quick Action Buttons Elements
+        const btnQuickSshStart = document.getElementById('btn-quick-ssh-start');
+        const btnQuickSshStop = document.getElementById('btn-quick-ssh-stop');
+        const btnQuickProcesses = document.getElementById('btn-quick-processes');
+        const btnQuickLs = document.getElementById('btn-quick-ls');
+
+        // Helper to trigger terminal command
+        function runQuickCommand(commandText) {
+            // Switch to terminal tab
+            const termTabBtn = document.querySelector('.tab-btn[data-tab="terminal-pane"]');
+            if (termTabBtn) termTabBtn.click();
+
+            // Run command
+            terminalInput.value = commandText;
+            terminalForm.dispatchEvent(new Event('submit'));
+        }
+
+        btnQuickSshStart.addEventListener('click', () => {
+            runQuickCommand('sshd');
+        });
+
+        btnQuickSshStop.addEventListener('click', () => {
+            runQuickCommand('pkill sshd');
+        });
+
+        btnQuickProcesses.addEventListener('click', () => {
+            runQuickCommand('top -n 1 -b | head -n 15');
+        });
+
+        btnQuickLs.addEventListener('click', () => {
+            runQuickCommand('ls -lh');
+        });
+
+        // Loop fetching stats
+        fetchStats();
+        setInterval(fetchStats, 3000);
+    </script>
+</body>
+</html>
