@@ -1279,5 +1279,5 @@ func printStartupInfo(port string) {
 	fmt.Printf("   Username: %s\n", basicUser)
 	fmt.Printf("   Password: %s (Set DASHBOARD_PASSWORD env to override)\n", basicPass)
 	fmt.Println("==================================================")
-	fmt.Println("Press Ctrl+C to terminate the server.\n")
+	fmt.Println("Press Ctrl+C to terminate the server.")
 }
