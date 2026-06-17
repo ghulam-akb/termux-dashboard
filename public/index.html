@@ -8,8 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Leaflet.js Map CDN CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     
     <style>
         :root {
@@ -607,11 +606,10 @@
             box-shadow: none;
         }
     </style>
-    <!-- xterm.css, xterm.js & Leaflet.js Map imports -->
+    <!-- xterm.css & xterm.js imports -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -765,27 +763,7 @@
                     </div>
                 </div>
 
-                <!-- Card 5: Android API Integration -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <i class="fa-solid fa-robot"></i>
-                            Android Integrations
-                        </div>
-                    </div>
-                    
-                    <div class="stats-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-top: 1.25rem;">
-                        <button class="btn-block" id="btn-android-photo" style="background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); margin-top: 0; padding: 0.85rem;">
-                            <i class="fa-solid fa-camera"></i> Take Camera Photo
-                        </button>
-                        <button class="btn-block" id="btn-android-location" style="background: linear-gradient(135deg, #10b981 0%, #047857 100%); margin-top: 0; padding: 0.85rem;">
-                            <i class="fa-solid fa-location-crosshairs"></i> Get GPS Location
-                        </button>
-                        <button class="btn-block" id="btn-android-sms" style="background: linear-gradient(135deg, #eab308 0%, #a16207 100%); margin-top: 0; padding: 0.85rem;">
-                            <i class="fa-solid fa-envelope"></i> List Recent SMS
-                        </button>
-                    </div>
-                </div>
+
             </div>
         </div>
 
@@ -847,18 +825,7 @@
         </div>
     </main>
 
-    <!-- Android Dialog Modal Overlay -->
-    <div id="android-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); padding: 1.5rem;">
-        <div class="card" style="max-width: 600px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; position: relative;">
-            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-                <div class="card-title" id="android-modal-title">Android Action Result</div>
-                <button id="btn-close-modal" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.5rem; box-shadow: none; padding: 0;"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="android-modal-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; width: 100%;">
-                <!-- Dynamic content (photos, Leaflet maps, tables) goes here -->
-            </div>
-        </div>
-    </div>
+
 
     <footer>
         <p>Termux Dashboard &copy; 2026. Made with Glassmorphism Design.</p>
@@ -1356,183 +1323,7 @@
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
-        // ----------------------------------------------------
-        // Android API Frontend Logic (Overlay Modals)
-        // ----------------------------------------------------
-        const androidModal = document.getElementById('android-modal');
-        const androidModalTitle = document.getElementById('android-modal-title');
-        const androidModalContent = document.getElementById('android-modal-content');
-        const btnCloseModal = document.getElementById('btn-close-modal');
 
-        // Buttons
-        const btnAndroidPhoto = document.getElementById('btn-android-photo');
-        const btnAndroidLocation = document.getElementById('btn-android-location');
-        const btnAndroidSMS = document.getElementById('btn-android-sms');
-
-        function openModal(title, contentHTML) {
-            androidModalTitle.innerText = title;
-            androidModalContent.innerHTML = contentHTML;
-            androidModal.style.display = 'flex';
-        }
-
-        btnCloseModal.addEventListener('click', () => {
-            androidModal.style.display = 'none';
-            androidModalContent.innerHTML = ''; // Clear map memory or resources
-        });
-
-        // Close on overlay background click
-        androidModal.addEventListener('click', (e) => {
-            if (e.target === androidModal) {
-                btnCloseModal.click();
-            }
-        });
-
-        // Action 1: Capture Photo
-        btnAndroidPhoto.addEventListener('click', async () => {
-            openModal('Capturing Camera Photo', `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
-                    <p style="margin-top: 1rem; color: var(--text-muted);">Sedang mengambil foto via termux-camera-photo...</p>
-                </div>
-            `);
-
-            try {
-                const res = await fetch('/api/android/photo', { method: 'POST' });
-                const data = await res.json();
-                
-                if (res.ok) {
-                    openModal('Kamera Android (Captured)', `
-                        <img src="${data.url}?t=${Date.now()}" style="width: 100%; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); object-fit: contain; max-height: 50vh;" />
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">Foto berhasil ditangkap menggunakan Kamera HP.</p>
-                    `);
-                } else {
-                    openModal('Ambil Foto Gagal', `
-                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
-                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${data.error}</p>
-                    `);
-                }
-            } catch (err) {
-                openModal('Koneksi Gagal', `<p style="color: var(--danger);">Gagal terhubung ke API Termux.</p>`);
-            }
-        });
-
-        // Action 2: GPS Location Tracker
-        btnAndroidLocation.addEventListener('click', async () => {
-            openModal('Tracking Device Location', `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--success);"></i>
-                    <p style="margin-top: 1rem; color: var(--text-muted);">Menghubungi modul GPS HP... (Ini butuh beberapa detik)</p>
-                </div>
-            `);
-
-            try {
-                const res = await fetch('/api/android/location');
-                const data = await res.json();
-
-                if (res.ok) {
-                    const lat = data.latitude || data.lat;
-                    const lon = data.longitude || data.lon;
-                    const alt = data.altitude || 0;
-                    const acc = data.accuracy || 0;
-
-                    if (!lat || !lon) {
-                        throw new Error('Data koordinat kosong. Pastikan GPS HP aktif.');
-                    }
-
-                    openModal('Lokasi Geografis (GPS)', `
-                        <div id="map-container" style="width:100%; height:320px; border-radius:16px; border:1px solid var(--glass-border); box-shadow: 0 4px 15px rgba(0,0,0,0.3);"></div>
-                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; width: 100%; margin-top: 1rem;">
-                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Latitude</div><div class="stat-val" style="font-size:1rem;">${lat}</div></div>
-                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Longitude</div><div class="stat-val" style="font-size:1rem;">${lon}</div></div>
-                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Ketinggian</div><div class="stat-val" style="font-size:1rem;">${alt.toFixed(1)} m</div></div>
-                            <div class="stat-item" style="padding: 0.75rem;"><div class="stat-label">Akurasi</div><div class="stat-val" style="font-size:1rem;">${acc.toFixed(1)} m</div></div>
-                        </div>
-                    `);
-
-                    // Render Leaflet Map dynamically
-                    setTimeout(() => {
-                        const map = L.map('map-container').setView([lat, lon], 15);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            maxZoom: 19,
-                            attribution: '© OpenStreetMap contributors'
-                        }).addTo(map);
-
-                        L.marker([lat, lon]).addTo(map)
-                            .bindPopup(`<b>Ponsel Anda di sini</b><br>Akurasi: ${acc.toFixed(1)} meter.`)
-                            .openPopup();
-                    }, 200);
-
-                } else {
-                    openModal('GPS Tracker Gagal', `
-                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
-                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${data.error}</p>
-                    `);
-                }
-            } catch (err) {
-                openModal('GPS Tracker Gagal', `
-                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
-                    <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${err.message}</p>
-                `);
-            }
-        });
-
-        // Action 3: SMS Reader
-        btnAndroidSMS.addEventListener('click', async () => {
-            openModal('Membaca Daftar SMS...', `
-                <div style="text-align: center; padding: 2rem;">
-                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2.5rem; color: var(--warning);"></i>
-                    <p style="margin-top: 1rem; color: var(--text-muted);">Membaca berkas data SMS terbaru di HP...</p>
-                </div>
-            `);
-
-            try {
-                const res = await fetch('/api/android/sms');
-                const smsList = await res.json();
-
-                if (res.ok) {
-                    if (smsList.length === 0) {
-                        openModal('Daftar SMS Terakhir', `<p style="padding: 2rem; color: var(--text-muted);">Tidak ada SMS ditemukan.</p>`);
-                        return;
-                    }
-
-                    let tableRows = '';
-                    smsList.forEach(sms => {
-                        tableRows += `
-                            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); font-size:0.85rem;">
-                                <td style="padding: 0.85rem 0.5rem; font-weight:600; color:var(--primary);">${sms.sender || sms.address}</td>
-                                <td style="padding: 0.85rem 0.5rem; color:var(--text-muted); font-size:0.75rem;">${sms.received || sms.date}</td>
-                                <td style="padding: 0.85rem 0.5rem; color:var(--text);">${sms.body}</td>
-                            </tr>
-                        `;
-                    });
-
-                    openModal('5 SMS Masuk Terakhir', `
-                        <div style="width: 100%; overflow-x: auto;">
-                            <table style="width: 100%; border-collapse: collapse; text-align: left;">
-                                <thead>
-                                    <tr style="border-bottom: 2px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">
-                                        <th style="padding:0.5rem;">Pengirim</th>
-                                        <th style="padding:0.5rem;">Waktu</th>
-                                        <th style="padding:0.5rem;">Isi Pesan</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${tableRows}
-                                </tbody>
-                            </table>
-                        </div>
-                    `);
-
-                } else {
-                    openModal('Gagal Membaca SMS', `
-                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger);"></i>
-                        <p style="margin-top: 1rem; color: var(--danger); text-align: center;">${smsList.error}</p>
-                    `);
-                }
-            } catch (err) {
-                openModal('Membaca SMS Gagal', `<p style="color: var(--danger);">Gagal terhubung ke API Termux.</p>`);
-            }
-        });
 
         // Loop fetching stats
         fetchStats();

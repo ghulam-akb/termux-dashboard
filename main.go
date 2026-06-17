@@ -154,12 +154,6 @@ func main() {
 	mux.HandleFunc("POST /api/files/upload", handleFileUpload)
 	mux.HandleFunc("POST /api/files/delete", handleFileDelete)
 
-	// Android API Endpoints
-	mux.HandleFunc("POST /api/android/photo", handleAndroidPhoto)
-	mux.HandleFunc("GET /api/android/photo/view", handleAndroidPhotoView)
-	mux.HandleFunc("GET /api/android/location", handleAndroidLocation)
-	mux.HandleFunc("GET /api/android/sms", handleAndroidSMS)
-
 	// WebSocket / Token Endpoints
 	mux.HandleFunc("POST /api/token", handleGetToken)
 	mux.HandleFunc("GET /ws/terminal", handleTerminalWS)
@@ -201,8 +195,8 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Step B: Check HTTP Basic Authentication (skip for WebSocket and Photo View endpoints)
-		if r.URL.Path != "/ws/terminal" && r.URL.Path != "/api/android/photo/view" {
+		// Step B: Check HTTP Basic Authentication (skip for WebSocket endpoint)
+		if r.URL.Path != "/ws/terminal" {
 			user, pass, ok := r.BasicAuth()
 			if !ok || user != basicUser || pass != basicPass {
 				w.Header().Set("WWW-Authenticate", `Basic realm="Secure Termux Dashboard"`)
@@ -213,15 +207,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Step C: Check Interactive Android Confirmation Dialog (Only for authenticated requests)
-		// Skip for photo view since it's an embedded image load and doesn't trigger shell access
-		if r.URL.Path != "/api/android/photo/view" {
-			allowedInt, reasonInt := checkIPInteractive(ip)
-			if !allowedInt {
-				logBlockedAttempt(ip, r, reasonInt)
-				w.WriteHeader(http.StatusForbidden)
-				fmt.Fprintf(w, "Access Denied: Connection rejected by the device owner.\n")
-				return
-			}
+		allowedInt, reasonInt := checkIPInteractive(ip)
+		if !allowedInt {
+			logBlockedAttempt(ip, r, reasonInt)
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, "Access Denied: Connection rejected by the device owner.\n")
+			return
 		}
 
 		logConnection(ip, r)
@@ -464,111 +455,7 @@ func handleFileDelete(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "Deleted"})
 }
 
-// ----------------------------------------------------
-// Android API Integration Handlers
-// ----------------------------------------------------
 
-func handleAndroidPhoto(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	// Check if termux-camera-photo is available
-	_, err := exec.LookPath("termux-camera-photo")
-	if err != nil {
-		w.WriteHeader(http.StatusNotImplemented)
-		json.NewEncoder(w).Encode(map[string]string{"error": "termux-camera-photo tidak ditemukan. Pastikan termux-api terpasang."})
-		return
-	}
-
-	// Capture photo (using default back camera ID 0)
-	tempPhoto := "captured_temp.jpg"
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "termux-camera-photo", "-c", "0", tempPhoto)
-	if err := cmd.Run(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil foto: " + err.Error()})
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "captured",
-		"url":    "/api/android/photo/view",
-	})
-}
-
-func handleAndroidPhotoView(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	tempPhoto := "captured_temp.jpg"
-	if _, err := os.Stat(tempPhoto); os.IsNotExist(err) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("No captured photo available"))
-		return
-	}
-
-	http.ServeFile(w, r, tempPhoto)
-}
-
-func handleAndroidLocation(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	_, err := exec.LookPath("termux-location")
-	if err != nil {
-		w.WriteHeader(http.StatusNotImplemented)
-		json.NewEncoder(w).Encode(map[string]string{"error": "termux-location tidak ditemukan. Pastikan GPS HP aktif & termux-api terpasang."})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	// Run termux-location -p gps (using GPS provider)
-	cmd := exec.CommandContext(ctx, "termux-location", "-p", "gps", "-r", "once")
-	output, err := cmd.Output()
-	if err != nil {
-		// Try fallback to network location provider if GPS fails
-		cmdFallback := exec.CommandContext(ctx, "termux-location", "-p", "network", "-r", "once")
-		output, err = cmdFallback.Output()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mendapatkan lokasi GPS: " + err.Error()})
-			return
-		}
-	}
-
-	// Send raw JSON from termux-location directly to client
-	w.Write(output)
-}
-
-func handleAndroidSMS(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	_, err := exec.LookPath("termux-sms-list")
-	if err != nil {
-		w.WriteHeader(http.StatusNotImplemented)
-		json.NewEncoder(w).Encode(map[string]string{"error": "termux-sms-list tidak ditemukan. Pastikan izin membaca SMS diberikan ke Termux:API."})
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	// Run termux-sms-list -l 5 (limit 5 recent SMS)
-	cmd := exec.CommandContext(ctx, "termux-sms-list", "-l", "5")
-	output, err := cmd.Output()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal membaca SMS: " + err.Error()})
-		return
-	}
-
-	w.Write(output)
-}
 
 // ----------------------------------------------------
 // Security & IP Helpers
