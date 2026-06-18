@@ -8,29 +8,34 @@ Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfung
 
 ## Fitur Utama
 
-1. **Dashboard Metrik**: Menampilkan status baterai, penggunaan RAM, sisa penyimpanan, dan uptime perangkat.
-2. **Biner Tunggal (Single-Binary)**: Semua file statis frontend (HTML, CSS, JS) di-embed ke dalam biner Go menggunakan `go:embed`. Aplikasi dapat dijalankan langsung sebagai satu file executable.
-3. **Koneksi HTTPS**: Menggunakan SSL/TLS secara default. Sertifikat `cert.pem` dan `key.pem` dibuat otomatis saat server pertama kali dijalankan.
-4. **Autentikasi Basic**: Akses dashboard dilindungi oleh HTTP Basic Authentication.
-5. **Terminal WebTTY**: Terminal remote interaktif menggunakan WebSockets dan `xterm.js` yang terhubung langsung ke shell PTY (`bash` atau `sh`). Mendukung penyesuaian ukuran terminal.
-6. **Manajemen File (File Explorer)**: Navigasi direktori, unduh, hapus, dan unggah file (ukuran maksimal 50MB).
-7. **Keamanan IP**: Filter akses menggunakan berkas konfigurasi `whitelist.txt` dan `blacklist.txt`.
-8. **Konfirmasi Koneksi Android**: Menampilkan notifikasi dan dialog konfirmasi persetujuan di layar HP ketika ada percobaan koneksi baru dari IP eksternal.
-9. **Log Koneksi**: Mencatat setiap aktivitas koneksi masuk ke dalam file `connections.log`.
-10. **Android Wake Lock**: Otomatis mengaktifkan wake lock (`termux-wake-lock`) untuk mencegah CPU Android tidur saat server berjalan, sehingga koneksi background tetap stabil.
+1. **Dashboard Metrik & Grafik Realtime**: Menampilkan status baterai, penggunaan RAM, sisa penyimpanan, penggunaan CPU (%), spesifikasi CPU/HP, uptime, serta grafik performa realtime yang interaktif (menggunakan Chart.js).
+2. **Editor Teks Terintegrasi (Built-in Text Editor)**: Mengedit dan menyimpan file teks (seperti konfigurasi, skrip, log) secara langsung dari peramban tanpa perlu proses unduh-unggah ulang.
+3. **Manajer Proses Interaktif (Process Manager)**: Memantau daftar proses aktif yang berjalan di Termux (PID, CPU, Memori) lengkap dengan tombol *Kill Process* sekali klik.
+4. **Keamanan Ekstra (Bcrypt Hashing)**: Melindungi otentikasi login Basic Auth dengan hashing sandi berbasis **Bcrypt** untuk mencegah kebocoran kredensial.
+5. **Arsitektur Modular (Clean Code)**: Kode backend dipisah secara rapi berdasarkan domain fungsional (`main.go`, `handlers.go`, `metrics.go`, `security.go`, `terminal.go`, `process.go`, `cert.go`) untuk kemudahan pemeliharaan jangka panjang.
+6. **Biner Tunggal (Single-Binary)**: Semua file statis frontend (HTML, CSS, JS) di-embed ke dalam biner Go menggunakan `go:embed`. Aplikasi dapat dijalankan langsung sebagai satu file executable.
+7. **Koneksi HTTPS**: Menggunakan SSL/TLS secara default. Sertifikat `cert.pem` dan `key.pem` dibuat otomatis saat server pertama kali dijalankan.
+8. **Autentikasi Basic**: Akses dashboard dilindungi oleh HTTP Basic Authentication.
+9. **Terminal WebTTY**: Terminal remote interaktif menggunakan WebSockets dan `xterm.js` yang terhubung langsung ke shell PTY (`bash` atau `sh`). Mendukung penyesuaian ukuran terminal.
+10. **Manajemen File (File Explorer)**: Navigasi direktori, unduh, hapus, dan unggah file (ukuran maksimal 50MB).
+11. **Keamanan IP**: Filter akses menggunakan berkas konfigurasi `whitelist.txt` dan `blacklist.txt`.
+12. **Konfirmasi Android Koneksi**: Menampilkan notifikasi dan dialog konfirmasi persetujuan di layar HP ketika ada percobaan koneksi baru dari IP eksternal.
+13. **Log Koneksi**: Mencatat setiap aktivitas koneksi masuk ke dalam file `connections.log`.
+14. **Android Wake Lock**: Otomatis mengaktifkan wake lock (`termux-wake-lock`) untuk mencegah CPU Android tidur saat server berjalan, sehingga koneksi background tetap stabil.
 
 ---
 
 ## Struktur Direktori
 
-- `main.go` — Kode backend server HTTP Go, middleware keamanan, dan WebTTY.
-- `public/index.html` — Frontend statis (HTML/CSS/JS).
+- `main.go` — Titik masuk server, penyiapan router, server HTTPS, dan pembersihan shutdown.
+- `handlers.go` — Kumpulan handler API HTTP (metrik, file manager, proses, perintah cepat).
+- `metrics.go` — Mengambil status baterai, memori, penyimpanan, uptime, dan CPU usage (via toybox top parser).
+- `security.go` — Autentikasi Basic Auth (Bcrypt), logging IP, dan middleware whitelist/blacklist.
+- `terminal.go` — Logika PTY WebTTY WebSocket.
+- `process.go` — Logika manajer proses (membaca proses aktif dan menghentikannya).
+- `cert.go` — Logika pembuatan sertifikat SSL *self-signed*.
+- `public/index.html` — Frontend statis (HTML/CSS/JS/Chart.js).
 - `dashboard` — Executable biner hasil kompilasi.
-- `LICENSE` — Berkas lisensi MIT untuk proyek.
-- `cert.pem` & `key.pem` — Sertifikat SSL untuk enkripsi HTTPS (dibuat otomatis).
-- `connections.log` — Log riwayat IP yang mengakses dashboard (dibuat otomatis).
-- `whitelist.txt` — Daftar IP/Subnet yang diizinkan mengakses dashboard.
-- `blacklist.txt` — Daftar IP/Subnet yang diblokir dari dashboard.
 
 ---
 
@@ -59,11 +64,20 @@ Biner akan membuat berkas `cert.pem` dan `key.pem` secara otomatis.
 
 ## API Reference
 
-### File Manager
+### Sistem & Metrik
+* **`GET /api/stats`**: Mendapatkan metrik perangkat terbaru (baterai, RAM, penyimpanan, penggunaan CPU, spesifikasi hardware, dan interface jaringan) dalam format JSON.
+
+### File Manager & Editor
 * **`GET /api/files/list?path=<direktori>`**: Menampilkan daftar file dan folder (default ke direktori aktif `.`).
 * **`GET /api/files/download?path=<file>`**: Mengunduh berkas.
 * **`POST /api/files/upload?path=<direktori>`**: Mengunggah berkas ke direktori tujuan (batas ukuran 50MB).
 * **`POST /api/files/delete`**: Menghapus berkas atau folder (Menerima JSON: `{"path": "<path_berkas>"}`).
+* **`GET /api/files/view?path=<file>`**: Membaca isi file teks untuk editor teks built-in.
+* **`POST /api/files/save`**: Menyimpan perubahan isi file teks (Menerima JSON: `{"path": "<file>", "content": "<isi_baru>"}`).
+
+### Manajer Proses
+* **`GET /api/processes`**: Mengambil daftar proses aktif yang sedang berjalan (PID, CPU, Memori, Command).
+* **`POST /api/processes/kill`**: Menghentikan proses aktif berdasarkan PID (Menerima JSON: `{"pid": <PID>}`).
 
 ### Perintah Cepat (Device Diagnostics)
 * **`POST /api/vibrate`**: Mengaktifkan getar ponsel (memerlukan `termux-api`).
@@ -97,9 +111,9 @@ Jika Anda menduplikasi proyek ini atau ingin membangun biner executable sendiri 
    git clone https://github.com/ghulam-akb/termux-dashboard.git
    cd termux-dashboard
    ```
-2. Jalankan perintah kompilasi menggunakan Go:
+2. Jalankan perintah kompilasi menggunakan Go (mengompilasi semua file modular):
    ```bash
-   go build -o dashboard main.go
+   go build -o dashboard
    ```
    *Biner mandiri baru bernama `dashboard` akan dibuat di dalam direktori proyek.*
 

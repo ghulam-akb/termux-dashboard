@@ -605,11 +605,19 @@
             transform: none;
             box-shadow: none;
         }
+
+        @media (min-width: 900px) {
+            .chart-card-span {
+                grid-column: span 2;
+            }
+        }
     </style>
     <!-- xterm.css & xterm.js imports -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <!-- Chart.js import -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -623,6 +631,7 @@
             <button class="tab-btn active" data-tab="dashboard-pane"><i class="fa-solid fa-chart-simple"></i> Status</button>
             <button class="tab-btn" data-tab="terminal-pane"><i class="fa-solid fa-terminal"></i> Terminal</button>
             <button class="tab-btn" data-tab="files-pane"><i class="fa-solid fa-folder-open"></i> Files</button>
+            <button class="tab-btn" data-tab="processes-pane" id="tab-btn-processes"><i class="fa-solid fa-list-check"></i> Processes</button>
         </nav>
 
         <div class="status-badge" id="online-status">Connected</div>
@@ -696,6 +705,17 @@
                         </div>
                     </div>
 
+                    <!-- CPU Progress Bar -->
+                    <div class="linear-progress-container" style="margin-top: 1.75rem;">
+                        <div class="bar-label-container">
+                            <span>CPU Utilization</span>
+                            <span id="cpu-text">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="cpu-fill" style="background: linear-gradient(90deg, var(--warning), var(--danger))"></div>
+                        </div>
+                    </div>
+
                     <div class="stats-grid" style="margin-top: 2rem;">
                         <div class="stat-item" style="grid-column: span 2;">
                             <div class="stat-label">Uptime & Load Average</div>
@@ -763,6 +783,49 @@
                     </div>
                 </div>
 
+                <!-- Card 5: Device Specifications -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-circle-info"></i>
+                            Device Specifications
+                        </div>
+                    </div>
+                    <div class="stats-grid" style="grid-template-columns: 1fr; gap: 1rem; margin-top: 1rem; text-align: left;">
+                        <div class="stat-item" style="text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem;">
+                            <span class="stat-label" style="margin-bottom: 0;">Model</span>
+                            <span class="stat-val" id="sys-model" style="font-size: 0.95rem;">-</span>
+                        </div>
+                        <div class="stat-item" style="text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem;">
+                            <span class="stat-label" style="margin-bottom: 0;">OS Version</span>
+                            <span class="stat-val" id="sys-os" style="font-size: 0.95rem;">-</span>
+                        </div>
+                        <div class="stat-item" style="text-align: left; display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem;">
+                            <span class="stat-label" style="margin-bottom: 0;">Kernel</span>
+                            <span class="stat-val" id="sys-kernel" style="font-size: 0.85rem; font-family: monospace;">-</span>
+                        </div>
+                        <div class="stat-item" style="text-align: left; display: flex; flex-direction: column; align-items: flex-start; padding: 0.85rem 1.25rem; gap: 0.5rem;">
+                            <span class="stat-label" style="margin-bottom: 0; align-self: flex-start;">Network Interfaces</span>
+                            <div id="sys-networks" style="font-size: 0.85rem; font-family: monospace; width: 100%; display: flex; flex-direction: column; gap: 0.35rem; text-align: left;">
+                                -
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 6: Realtime Performance Chart -->
+                <div class="card chart-card-span">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-chart-line"></i>
+                            Realtime Performance
+                        </div>
+                    </div>
+                    <div style="position: relative; height: 280px; width: 100%; margin-top: 1rem;">
+                        <canvas id="realtime-chart"></canvas>
+                    </div>
+                </div>
+
 
             </div>
         </div>
@@ -813,7 +876,7 @@
                                 <th style="padding: 0.75rem;">Name</th>
                                 <th style="padding: 0.75rem; text-align: right;">Size</th>
                                 <th style="padding: 0.75rem; text-align: right;">Modified</th>
-                                <th style="padding: 0.75rem; text-align: center; width: 80px;">Delete</th>
+                                <th style="padding: 0.75rem; text-align: center; width: 140px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="file-table-body">
@@ -823,7 +886,58 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab 4: Process Manager Pane -->
+        <div id="processes-pane" class="tab-pane">
+            <div class="card" style="min-height: 550px; display: flex; flex-direction: column;">
+                <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div class="card-title">
+                        <i class="fa-solid fa-list-check"></i>
+                        Active Processes
+                    </div>
+                    <div class="process-actions">
+                        <button id="btn-refresh-processes" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; color: #0b0f19;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    </div>
+                </div>
+                
+                <div class="process-list-container" style="flex: 1; overflow-y: auto; max-height: 450px;">
+                    <table class="files-table">
+                        <thead>
+                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <th style="padding: 0.75rem; width: 80px;">PID</th>
+                                <th style="padding: 0.75rem; width: 100px;">User</th>
+                                <th style="padding: 0.75rem; width: 80px; text-align: right;">CPU %</th>
+                                <th style="padding: 0.75rem; width: 80px; text-align: right;">MEM %</th>
+                                <th style="padding: 0.75rem;">Command</th>
+                                <th style="padding: 0.75rem; text-align: center; width: 100px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="process-table-body">
+                            <!-- Process rows go here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <!-- UI Text Editor Modal -->
+    <div id="editor-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 8, 16, 0.85); backdrop-filter: blur(12px); display: none; z-index: 1050; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="card" style="width: 100%; max-width: 900px; height: 90%; display: flex; flex-direction: column; background: var(--bg-color); border: 1px solid var(--glass-border); padding: 1.5rem;">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 0.75rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <div class="card-title" id="editor-title" style="font-size: 1.05rem; font-family: monospace; color: var(--primary);">
+                    Editing: filename.txt
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button id="btn-editor-save" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); color: #0b0f19;"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    <button id="btn-editor-close" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: rgba(255,23,68,0.1); border: 1px solid rgba(255,23,68,0.2); color: var(--danger);"><i class="fa-solid fa-xmark"></i> Close</button>
+                </div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; background: #020408; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
+                <textarea id="editor-textarea" style="flex: 1; width: 100%; height: 100%; background: transparent; border: none; outline: none; padding: 1rem; color: #39ff14; font-family: 'Courier New', Courier, monospace; font-size: 0.95rem; resize: none; line-height: 1.5;" placeholder="Ketik teks di sini..."></textarea>
+            </div>
+        </div>
+    </div>
 
 
 
@@ -855,6 +969,13 @@
         const storageFill = document.getElementById('storage-fill');
         const uptimeVal = document.getElementById('uptime-val');
 
+        const cpuText = document.getElementById('cpu-text');
+        const cpuFill = document.getElementById('cpu-fill');
+        const sysModel = document.getElementById('sys-model');
+        const sysOs = document.getElementById('sys-os');
+        const sysKernel = document.getElementById('sys-kernel');
+        const sysNetworks = document.getElementById('sys-networks');
+
         const ttsInput = document.getElementById('tts-input');
         const btnTts = document.getElementById('btn-tts');
         const toastInput = document.getElementById('toast-input');
@@ -883,6 +1004,8 @@
                         initTerminal();
                     } else if (targetTab === 'files-pane') {
                         loadFiles(currentPath);
+                    } else if (targetTab === 'processes-pane') {
+                        loadProcesses();
                     }
                 }
             });
@@ -954,8 +1077,9 @@
 
             // 2. RAM Memory
             const ram = data.ram || {};
+            let ramPercent = 0;
             if (ram.total > 0) {
-                const ramPercent = Math.round((ram.used / ram.total) * 100);
+                ramPercent = Math.round((ram.used / ram.total) * 100);
                 ramText.innerText = `${ram.used} MB / ${ram.total} MB (${ramPercent}%)`;
                 ramFill.style.width = `${ramPercent}%`;
             } else {
@@ -976,6 +1100,36 @@
 
             // 4. Uptime
             uptimeVal.innerText = data.uptime || 'Unavailable';
+
+            // 5. CPU Utilization
+            const cpu = data.cpu || {};
+            const cpuUsage = Math.round(cpu.usage || 0);
+            const coresCount = cpu.cores || 0;
+            const cpuModel = cpu.model || 'Unknown CPU';
+            cpuText.innerText = `${cpuUsage}% (${coresCount} Cores - ${cpuModel})`;
+            cpuFill.style.width = `${cpuUsage}%`;
+
+            // 6. System Specifications
+            const system = data.system || {};
+            sysModel.innerText = system.model || 'Android Device';
+            sysOs.innerText = system.os || 'Android';
+            sysKernel.innerText = system.kernel || 'Linux';
+
+            // Render network interfaces
+            if (system.net_interfaces && system.net_interfaces.length > 0) {
+                sysNetworks.innerHTML = system.net_interfaces.map(iface => {
+                    const ipsStr = iface.ips.join(', ');
+                    return `<div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 0.25rem;">
+                        <span style="color: var(--primary); font-weight: 600;">${iface.name}</span>
+                        <span style="color: var(--text);">${ipsStr}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                sysNetworks.innerHTML = '<div style="color: var(--text-muted);">No active interfaces</div>';
+            }
+
+            // 7. Update Realtime Chart
+            updateChartData(cpuUsage, ramPercent, percent);
         }
 
         // Action Handlers
@@ -1210,6 +1364,72 @@
             }
         }
 
+        function isEditableTextFile(filename) {
+            const textExtensions = ['.txt', '.log', '.json', '.js', '.py', '.sh', '.css', '.html', '.go', '.md', '.sum', '.mod', '.conf', '.ini', '.yaml', '.yml', '.bashrc', '.profile'];
+            const lowerName = filename.toLowerCase();
+            return textExtensions.some(ext => lowerName.endsWith(ext)) || !filename.includes('.');
+        }
+
+        async function openTextEditor(filePath, filename) {
+            const editorModal = document.getElementById('editor-modal');
+            const editorTitle = document.getElementById('editor-title');
+            const editorTextarea = document.getElementById('editor-textarea');
+            const btnSave = document.getElementById('btn-editor-save');
+            
+            editorTitle.innerText = `Loading: ${filename}...`;
+            editorTextarea.value = '';
+            editorModal.style.display = 'flex';
+
+            try {
+                const res = await fetch(`/api/files/view?path=${encodeURIComponent(filePath)}`);
+                if (!res.ok) throw new Error('Gagal membaca file');
+                const data = await res.json();
+                
+                editorTitle.innerText = `Editing: ${filePath}`;
+                editorTextarea.value = data.content || '';
+                
+                // Unbind previous save events by clone/replace
+                const newBtnSave = btnSave.cloneNode(true);
+                btnSave.parentNode.replaceChild(newBtnSave, btnSave);
+                
+                newBtnSave.addEventListener('click', async () => {
+                    newBtnSave.disabled = true;
+                    newBtnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+                    
+                    try {
+                        const saveRes = await fetch('/api/files/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                path: filePath,
+                                content: editorTextarea.value
+                            })
+                        });
+                        
+                        if (saveRes.ok) {
+                            showToast('File berhasil disimpan!');
+                        } else {
+                            const errData = await saveRes.json();
+                            showToast(errData.error || 'Gagal menyimpan file', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Error koneksi saat menyimpan file', 'error');
+                    } finally {
+                        newBtnSave.disabled = false;
+                        newBtnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save';
+                    }
+                });
+                
+            } catch (err) {
+                showToast(err.message, 'error');
+                editorModal.style.display = 'none';
+            }
+        }
+
+        document.getElementById('btn-editor-close').addEventListener('click', () => {
+            document.getElementById('editor-modal').style.display = 'none';
+        });
+
         function renderFileList(files) {
             fileTableBody.innerHTML = '';
             
@@ -1229,6 +1449,11 @@
                 const sizeStr = file.isDir ? '-' : formatBytes(file.size);
                 const filePath = currentPath + '/' + file.name;
 
+                // Action buttons
+                const deleteBtn = `<button class="btn-action btn-delete" data-path="${filePath}" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>`;
+                const downloadBtn = file.isDir ? '' : `<button class="btn-action btn-download" data-path="${filePath}" title="Unduh" style="color: var(--secondary);"><i class="fa-solid fa-download"></i></button>`;
+                const editBtn = (!file.isDir && isEditableTextFile(file.name)) ? `<button class="btn-action btn-edit" data-path="${filePath}" title="Edit" style="color: var(--warning);"><i class="fa-solid fa-pen-to-square"></i></button>` : '';
+
                 row.innerHTML = `
                     <td class="name-cell" style="padding: 0.95rem 0.75rem;">
                         ${icon} <span style="margin-left: 0.5rem;">${file.name}</span>
@@ -1236,17 +1461,35 @@
                     <td style="text-align: right; color: var(--text-muted);">${sizeStr}</td>
                     <td style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">${file.mtime}</td>
                     <td style="text-align: center;">
-                        <button class="btn-action btn-delete" data-path="${filePath}"><i class="fa-solid fa-trash-can"></i></button>
+                        ${editBtn}
+                        ${downloadBtn}
+                        ${deleteBtn}
                     </td>
                 `;
 
                 // Navigation Events
                 if (file.isDir) {
                     row.querySelector('.name-cell').addEventListener('click', () => loadFiles(filePath));
+                } else if (isEditableTextFile(file.name)) {
+                    row.querySelector('.name-cell').addEventListener('click', () => openTextEditor(filePath, file.name));
                 } else {
                     row.querySelector('.name-cell').addEventListener('click', () => {
                         window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
                     });
+                }
+
+                // Bind Button Events
+                if (!file.isDir) {
+                    row.querySelector('.btn-download').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
+                    });
+                    if (isEditableTextFile(file.name)) {
+                        row.querySelector('.btn-edit').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openTextEditor(filePath, file.name);
+                        });
+                    }
                 }
 
                 // Delete Event
@@ -1326,7 +1569,191 @@
 
 
 
+        // Chart.js Realtime Performance Chart configuration
+        let performanceChart = null;
+        const maxDataPoints = 15; // Show last 15 data points (45 seconds of history)
+        const chartLabels = Array(maxDataPoints).fill('');
+        const cpuData = Array(maxDataPoints).fill(0);
+        const ramData = Array(maxDataPoints).fill(0);
+        const batteryData = Array(maxDataPoints).fill(0);
+
+        function initPerformanceChart() {
+            const ctx = document.getElementById('realtime-chart').getContext('2d');
+
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: 'CPU (%)',
+                            data: cpuData,
+                            borderColor: '#ff1744',
+                            backgroundColor: 'rgba(255, 23, 68, 0.05)',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'RAM (%)',
+                            data: ramData,
+                            borderColor: '#00f2fe',
+                            backgroundColor: 'rgba(0, 242, 254, 0.05)',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Baterai (%)',
+                            data: batteryData,
+                            borderColor: '#00e676',
+                            backgroundColor: 'rgba(0, 230, 118, 0.05)',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                font: {
+                                    family: 'Outfit'
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#f3f4f6',
+                                font: {
+                                    family: 'Outfit',
+                                    size: 11
+                                },
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartData(cpu, ram, battery) {
+            if (!performanceChart) return;
+
+            cpuData.shift();
+            cpuData.push(cpu);
+
+            ramData.shift();
+            ramData.push(ram);
+
+            batteryData.shift();
+            batteryData.push(battery);
+
+            chartLabels.shift();
+            chartLabels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+            performanceChart.update('none');
+        }
+
+        // ----------------------------------------------------
+        // Process Manager Frontend Logic
+        // ----------------------------------------------------
+        const processTableBody = document.getElementById('process-table-body');
+        const btnRefreshProcesses = document.getElementById('btn-refresh-processes');
+
+        async function loadProcesses() {
+            processTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading active processes...</td></tr>';
+            try {
+                const res = await fetch('/api/processes');
+                if (!res.ok) throw new Error('Failed to read processes list');
+                const list = await res.json();
+                renderProcessList(list);
+            } catch (err) {
+                showToast(err.message, 'error');
+                processTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--danger);">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderProcessList(list) {
+            processTableBody.innerHTML = '';
+            
+            // Sort by CPU usage descending
+            list.sort((a, b) => b.cpu - a.cpu);
+
+            if (list.length === 0) {
+                processTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">No running processes</td></tr>';
+                return;
+            }
+
+            list.forEach(proc => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td style="padding: 0.95rem 0.75rem; font-family: monospace; font-weight: 600;">${proc.pid}</td>
+                    <td style="color: var(--text-muted);">${proc.user}</td>
+                    <td style="text-align: right; color: var(--warning); font-weight: 600;">${proc.cpu.toFixed(1)}%</td>
+                    <td style="text-align: right; color: var(--primary);">${proc.mem.toFixed(1)}%</td>
+                    <td style="font-family: monospace; font-size: 0.85rem; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${proc.command}">${proc.command}</td>
+                    <td style="text-align: center;">
+                        <button class="btn-action btn-kill-proc" data-pid="${proc.pid}" data-name="${proc.command}" style="color: var(--danger);"><i class="fa-solid fa-ban"></i> Kill</button>
+                    </td>
+                `;
+
+                row.querySelector('.btn-kill-proc').addEventListener('click', async (e) => {
+                    const pid = proc.pid;
+                    const cmdShort = proc.command.split(' ')[0].split('/').pop();
+                    if (confirm(`Apakah Anda yakin ingin menghentikan proses "${cmdShort}" (PID: ${pid})?`)) {
+                        try {
+                            const killRes = await fetch('/api/processes/kill', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ pid })
+                            });
+                            if (killRes.ok) {
+                                showToast(`Proses ${pid} berhasil dihentikan!`);
+                                loadProcesses();
+                            } else {
+                                const errData = await killRes.json();
+                                showToast(errData.error || 'Gagal menghentikan proses', 'error');
+                            }
+                        } catch (err) {
+                            showToast('Gagal terhubung ke server', 'error');
+                        }
+                    }
+                });
+
+                processTableBody.appendChild(row);
+            });
+        }
+
+        btnRefreshProcesses.addEventListener('click', loadProcesses);
+
         // Loop fetching stats
+        initPerformanceChart();
         fetchStats();
         setInterval(fetchStats, 3000);
     </script>
