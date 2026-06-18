@@ -1,4 +1,4 @@
-# Termux System Dashboard & Remote Console (v1.1.0)
+# Termux System Dashboard & Remote Console (v1.2.0)
 
 Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfungsi menampilkan metrik perangkat, mengelola file, mengeksekusi perintah diagnostik cepat, dan menyediakan akses terminal remote terenkripsi SSL/TLS.
 
@@ -153,6 +153,11 @@ pkill dashboard
 ---
 
 ## Catatan Rilis (Changelog)
+
+### v1.2.0 (2026-06-18)
+*   **Stabilitas Koneksi Terminal (WebTTY)**: Mengatasi masalah putusnya terminal dengan menambahkan pengamanan *concurrent writes* menggunakan `sync.Mutex` pada WebSocket server, serta siklus *ping/pong* (keep-alive) otomatis setiap 25 detik untuk menghindari idle timeout.
+*   **Autentikasi Cadangan Berbasis Local Storage**: Memperkenalkan pengiriman token sesi via header `Authorization: Bearer <token>` dan `X-Session-Token` sebagai solusi ketika peramban memblokir cookie sesi (terjadi akibat kebijakan SameSite/Secure pada HTTPS sertifikat *self-signed* atau akses via alamat IP mentah).
+*   **Unduh Berkas Tanpa Hambatan**: Mendukung verifikasi token sesi melalui parameter query pada endpoint unduhan untuk memastikan pengunduhan file tetap berfungsi meski cookie dinonaktifkan/diblokir browser.
 
 ### v1.1.0 (2026-06-18)
 *   **Keamanan Premium**: Menambahkan halaman Login kustom *glassmorphism* berbasis Cookie HTTP-Only (menggantikan Basic Auth bawaan browser), tombol Logout di header, dan fitur auto-banned IP (Fail2Ban) setelah 3 kali gagal login.
