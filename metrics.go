@@ -49,10 +49,14 @@ type NetInterface struct {
 }
 
 type SystemInfo struct {
-	OS     string         `json:"os"`
-	Kernel string         `json:"kernel"`
-	Model  string         `json:"model"`
-	NetIf  []NetInterface `json:"net_interfaces"`
+	OS               string         `json:"os"`
+	Kernel           string         `json:"kernel"`
+	Model            string         `json:"model"`
+	User             string         `json:"user"`
+	NetIf            []NetInterface `json:"net_interfaces"`
+	VibrateAvailable bool           `json:"vibrate_available"`
+	TTSAvailable     bool           `json:"tts_available"`
+	ToastAvailable   bool           `json:"toast_available"`
 }
 
 type StatsResponse struct {
@@ -477,11 +481,26 @@ func getSystemInfo() SystemInfo {
 		kernelVer = "Linux"
 	}
 
+	termuxUser := ""
+	if u, err := exec.Command("whoami").Output(); err == nil {
+		termuxUser = strings.TrimSpace(string(u))
+	} else {
+		termuxUser = os.Getenv("USER")
+	}
+
+	_, errVibrate := exec.LookPath("termux-vibrate")
+	_, errTTS := exec.LookPath("termux-tts-speak")
+	_, errToast := exec.LookPath("termux-toast")
+
 	return SystemInfo{
-		OS:     osName,
-		Kernel: kernelVer,
-		Model:  deviceModel,
-		NetIf:  getNetworkInterfaces(),
+		OS:               osName,
+		Kernel:           kernelVer,
+		Model:            deviceModel,
+		User:             termuxUser,
+		NetIf:            getNetworkInterfaces(),
+		VibrateAvailable: errVibrate == nil,
+		TTSAvailable:     errTTS == nil,
+		ToastAvailable:   errToast == nil,
 	}
 }
 
