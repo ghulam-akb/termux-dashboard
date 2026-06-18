@@ -1746,6 +1746,7 @@
                 const deleteBtn = `<button class="btn-action btn-delete" data-path="${filePath}" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>`;
                 const downloadBtn = file.isDir ? '' : `<button class="btn-action btn-download" data-path="${filePath}" title="Unduh" style="color: var(--secondary);"><i class="fa-solid fa-download"></i></button>`;
                 const editBtn = (!file.isDir && isEditableTextFile(file.name)) ? `<button class="btn-action btn-edit" data-path="${filePath}" title="Edit" style="color: var(--warning);"><i class="fa-solid fa-pen-to-square"></i></button>` : '';
+                const renameBtn = `<button class="btn-action btn-rename" data-path="${filePath}" title="Rename" style="color: var(--primary);"><i class="fa-solid fa-signature"></i></button>`;
 
                 const fileMeta = file.isDir ? '' : `<div class="file-mobile-meta">${sizeStr}</div>`;
                 row.innerHTML = `
@@ -1763,6 +1764,7 @@
                     <td style="text-align: center;">
                         <div style="display: flex; gap: 0.25rem; justify-content: center;">
                             ${editBtn}
+                            ${renameBtn}
                             ${downloadBtn}
                             ${deleteBtn}
                         </div>
