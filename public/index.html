@@ -1230,6 +1230,21 @@
     <script>
         const API_URL = ''; // Local server APIs
 
+        function getAuthToken() {
+            return localStorage.getItem('session_token') || '';
+        }
+
+        async function authFetch(url, options = {}) {
+            if (!options.headers) {
+                options.headers = {};
+            }
+            const token = getAuthToken();
+            if (token) {
+                options.headers['Authorization'] = `Bearer ${token}`;
+            }
+            return fetch(url, options);
+        }
+
         // Elements
         const batteryProgress = document.getElementById('battery-progress');
         const batteryPercentText = document.getElementById('battery-percent');
@@ -1309,7 +1324,7 @@
         // Fetch API Stats
         async function fetchStats() {
             try {
-                const res = await fetch(`${API_URL}/api/stats`);
+                const res = await authFetch(`${API_URL}/api/stats`);
                 if (res.status === 401) {
                     loginOverlay.style.display = 'flex';
                     return;
@@ -1425,7 +1440,7 @@
             if (!text) return;
             btnTts.disabled = true;
             try {
-                const res = await fetch(`${API_URL}/api/tts`, {
+                const res = await authFetch(`${API_URL}/api/tts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
@@ -1448,7 +1463,7 @@
             if (!text) return;
             btnToast.disabled = true;
             try {
-                const res = await fetch(`${API_URL}/api/toast`, {
+                const res = await authFetch(`${API_URL}/api/toast`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
@@ -1469,7 +1484,7 @@
         btnVibrate.addEventListener('click', async () => {
             btnVibrate.disabled = true;
             try {
-                const res = await fetch(`${API_URL}/api/vibrate`, {
+                const res = await authFetch(`${API_URL}/api/vibrate`, {
                     method: 'POST'
                 });
                 if (res.ok) {
@@ -1530,7 +1545,7 @@
             term.write('\x1b[33mRequesting secure one-time WebSocket token...\x1b[0m\r\n');
 
             try {
-                const tokenRes = await fetch(`${API_URL}/api/token`, { method: 'POST' });
+                const tokenRes = await authFetch(`${API_URL}/api/token`, { method: 'POST' });
                 if (tokenRes.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!tokenRes.ok) throw new Error('Auth token generation failed');
                 const tokenData = await tokenRes.json();
@@ -1642,7 +1657,7 @@
         async function loadFiles(path) {
             fileTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Loading files list...</td></tr>';
             try {
-                const res = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
+                const res = await authFetch(`/api/files/list?path=${encodeURIComponent(path)}`);
                 if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!res.ok) throw new Error('Failed to read folder');
                 const files = await res.json();
@@ -1674,7 +1689,7 @@
             editorModal.style.display = 'flex';
 
             try {
-                const res = await fetch(`/api/files/view?path=${encodeURIComponent(filePath)}`);
+                const res = await authFetch(`/api/files/view?path=${encodeURIComponent(filePath)}`);
                 if (!res.ok) throw new Error('Gagal membaca file');
                 const data = await res.json();
                 
@@ -1690,7 +1705,7 @@
                     newBtnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
                     
                     try {
-                        const saveRes = await fetch('/api/files/save', {
+                        const saveRes = await authFetch('/api/files/save', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -1778,7 +1793,7 @@
                     row.querySelector('.name-cell').addEventListener('click', () => openTextEditor(filePath, file.name));
                 } else {
                     row.querySelector('.name-cell').addEventListener('click', () => {
-                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
+                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}&session_token=${encodeURIComponent(localStorage.getItem('session_token') || '')}`;
                     });
                 }
 
@@ -1786,7 +1801,7 @@
                 if (!file.isDir) {
                     row.querySelector('.btn-download').addEventListener('click', (e) => {
                         e.stopPropagation();
-                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}`;
+                        window.location.href = `/api/files/download?path=${encodeURIComponent(filePath)}&session_token=${encodeURIComponent(localStorage.getItem('session_token') || '')}`;
                     });
                     if (isEditableTextFile(file.name)) {
                         row.querySelector('.btn-edit').addEventListener('click', (e) => {
@@ -1806,7 +1821,7 @@
                     const newP = currentPath + '/' + newName;
                     
                     try {
-                        const renameRes = await fetch('/api/files/rename', {
+                        const renameRes = await authFetch('/api/files/rename', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ oldPath: oldP, newPath: newP })
@@ -1829,7 +1844,7 @@
                     e.stopPropagation(); // Prevent trigger navigate
                     if (confirm(`Apakah Anda yakin ingin menghapus "${file.name}"?`)) {
                         try {
-                            const delRes = await fetch('/api/files/delete', {
+                            const delRes = await authFetch('/api/files/delete', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ path: filePath })
@@ -1871,7 +1886,7 @@
             showToast('Mengunggah berkas...', 'success');
 
             try {
-                const res = await fetch(`/api/files/upload?path=${encodeURIComponent(currentPath)}`, {
+                const res = await authFetch(`/api/files/upload?path=${encodeURIComponent(currentPath)}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -2022,7 +2037,7 @@
         async function loadProcesses() {
             processTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading active processes...</td></tr>';
             try {
-                const res = await fetch('/api/processes');
+                const res = await authFetch('/api/processes');
                 if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!res.ok) throw new Error('Failed to read processes list');
                 const list = await res.json();
@@ -2064,7 +2079,7 @@
                     const cmdShort = proc.command.split(' ')[0].split('/').pop();
                     if (confirm(`Apakah Anda yakin ingin menghentikan proses "${cmdShort}" (PID: ${pid})?`)) {
                         try {
-                            const killRes = await fetch('/api/processes/kill', {
+                            const killRes = await authFetch('/api/processes/kill', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ pid })
@@ -2164,6 +2179,8 @@
                 });
 
                 if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('session_token', data.token);
                     loginOverlay.style.display = 'none';
                     loginPasswordInput.value = '';
                     fetchStats();
@@ -2182,8 +2199,9 @@
         document.getElementById('btn-logout').addEventListener('click', async () => {
             if (confirm('Apakah Anda yakin ingin keluar?')) {
                 try {
-                    await fetch('/api/logout', { method: 'POST' });
+                    await authFetch('/api/logout', { method: 'POST' });
                 } catch(e) {}
+                localStorage.removeItem('session_token');
                 loginOverlay.style.display = 'flex';
             }
         });
@@ -2212,7 +2230,7 @@
             const newFilePath = currentPath + '/' + name;
             
             try {
-                const res = await fetch('/api/files/create', {
+                const res = await authFetch('/api/files/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: newFilePath, isDir: false })
@@ -2236,7 +2254,7 @@
             const newDirPath = currentPath + '/' + name;
             
             try {
-                const res = await fetch('/api/files/create', {
+                const res = await authFetch('/api/files/create', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: newDirPath, isDir: true })

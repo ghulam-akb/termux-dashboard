@@ -75,6 +75,14 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	// Mutex to protect concurrent writes to the WebSocket connection
+	var writeMutex sync.Mutex
+	writeMessage := func(messageType int, data []byte) error {
+		writeMutex.Lock()
+		defer writeMutex.Unlock()
+		return conn.WriteMessage(messageType, data)
+	}
+
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/data/data/com.termux/files/usr/bin/bash"
@@ -103,7 +111,37 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		"\n   Time:    %s\r"+
 		"\n\x1b[1;30mType 'exit' to close this connection.\x1b[0m\r"+
 		"\n\x1b[1;36m==================================================\x1b[0m\r\n\r\n", shell, time.Now().Format("2006-01-02 15:04:05"))
-	conn.WriteMessage(websocket.BinaryMessage, []byte(banner))
+	writeMessage(websocket.BinaryMessage, []byte(banner))
+
+	// Setup read limit and deadline
+	conn.SetReadLimit(4096)
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	// Start ping ticker to keep WebSocket connection alive
+	pingTicker := time.NewTicker(25 * time.Second)
+	defer pingTicker.Stop()
+
+	// Done channel to stop the ping goroutine when the connection ends
+	doneChan := make(chan struct{})
+	defer close(doneChan)
+
+	go func() {
+		for {
+			select {
+			case <-pingTicker.C:
+				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				if err := writeMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			case <-doneChan:
+				return
+			}
+		}
+	}()
 
 	// Pipe PTY stdout/stderr -> WebSocket
 	go func() {
@@ -111,10 +149,10 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 		for {
 			n, err := f.Read(buf)
 			if err != nil {
-				conn.WriteMessage(websocket.CloseMessage, []byte{})
+				writeMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			if err := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+			if err := writeMessage(websocket.BinaryMessage, buf[:n]); err != nil {
 				return
 			}
 		}
@@ -128,6 +166,8 @@ func handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 			Rows uint16 `json:"rows,omitempty"`
 			Cols uint16 `json:"cols,omitempty"`
 		}
+		// Reset read deadline on every message received
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			break

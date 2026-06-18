@@ -130,6 +130,32 @@ func initAuth() {
 	}
 }
 
+func extractSessionToken(r *http.Request) string {
+	// 1. Try Cookie
+	cookie, err := r.Cookie("session_token")
+	if err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	// 2. Try Authorization Header
+	authHeader := r.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimPrefix(authHeader, "Bearer ")
+	}
+
+	// 3. Try X-Session-Token Header
+	if token := r.Header.Get("X-Session-Token"); token != "" {
+		return token
+	}
+
+	// 4. Try Query Parameter (fallback for raw link download/navigation)
+	if token := r.URL.Query().Get("session_token"); token != "" {
+		return token
+	}
+
+	return ""
+}
+
 // Logging and Security Middleware
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -160,10 +186,10 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Step B: Check Session Cookie (skip for /api/login and /ws/terminal)
+		// Step B: Check Session Cookie/Header (skip for /api/login and /ws/terminal)
 		if r.URL.Path != "/api/login" && r.URL.Path != "/ws/terminal" {
-			cookie, err := r.Cookie("session_token")
-			if err != nil || !isValidSession(cookie.Value) {
+			token := extractSessionToken(r)
+			if token == "" || !isValidSession(token) {
 				if strings.HasPrefix(r.URL.Path, "/api/") {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusUnauthorized)

@@ -516,16 +516,19 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, cookie)
 
-	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "success",
+		"token":  token,
+	})
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	cookie, err := r.Cookie("session_token")
-	if err == nil {
-		removeSession(cookie.Value)
+	token := extractSessionToken(r)
+	if token != "" {
+		removeSession(token)
 	}
 
 	delCookie := &http.Cookie{
