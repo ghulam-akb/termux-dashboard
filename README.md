@@ -1,4 +1,4 @@
-# Termux System Dashboard & Remote Console
+# Termux System Dashboard & Remote Console (v1.1.0)
 
 Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfungsi menampilkan metrik perangkat, mengelola file, mengeksekusi perintah diagnostik cepat, dan menyediakan akses terminal remote terenkripsi SSL/TLS.
 
@@ -149,3 +149,13 @@ nohup ./dashboard > /dev/null 2>&1 &
 ```bash
 pkill dashboard
 ```
+
+---
+
+## Catatan Rilis (Changelog)
+
+### v1.1.0 (2026-06-18)
+*   **Keamanan Premium**: Menambahkan halaman Login kustom *glassmorphism* berbasis Cookie HTTP-Only (menggantikan Basic Auth bawaan browser), tombol Logout di header, dan fitur auto-banned IP (Fail2Ban) setelah 3 kali gagal login.
+*   **Peningkatan File Manager**: Menambahkan fitur pembuatan berkas/folder baru, aksi Ubah Nama (*Rename*) langsung di UI, serta penyaringan/pencarian berkas secara realtime.
+*   **Pemantauan Trafik Jaringan**: Menambahkan pembacaan metrik kecepatan masuk (Download) dan keluar (Upload) jaringan HP Android secara realtime.
+*   **Proses & Terminal Mobile**: Menambahkan fitur pencarian proses aktif, pengurutan kolom tabel proses (PID, CPU, Memori, dll), serta bar tombol pembantu terminal virtual untuk layar sentuh HP.
