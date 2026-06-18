@@ -33,10 +33,14 @@ func main() {
 		port = defaultPort
 	}
 
-	// Generate SSL certificates if missing
-	if err := checkOrGenerateCert(); err != nil {
-		fmt.Printf("Error checking/generating SSL certificate: %v\n", err)
-		os.Exit(1)
+	disableTLS := os.Getenv("DISABLE_TLS") == "true"
+
+	if !disableTLS {
+		// Generate SSL certificates if missing
+		if err := checkOrGenerateCert(); err != nil {
+			fmt.Printf("Error checking/generating SSL certificate: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -80,8 +84,14 @@ func main() {
 
 	go func() {
 		printStartupInfo(port)
-		if err := server.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Error starting secure HTTPS server: %v\n", err)
+		var err error
+		if disableTLS {
+			err = server.ListenAndServe()
+		} else {
+			err = server.ListenAndServeTLS("cert.pem", "key.pem")
+		}
+		if err != nil && err != http.ErrServerClosed {
+			fmt.Printf("Error starting server: %v\n", err)
 			os.Exit(1)
 		}
 	}()
@@ -178,18 +188,30 @@ func getLocalIPs() []string {
 }
 
 func printStartupInfo(port string) {
+	disableTLS := os.Getenv("DISABLE_TLS") == "true"
+	scheme := "https"
+	modeText := "HTTPS mode with WebTTY"
+	lockEmoji := "🔒"
+	titleText := "SECURE TERMUX SYSTEM DASHBOARD (GO SSL ENGINE)"
+	if disableTLS {
+		scheme = "http"
+		modeText = "HTTP mode (TLS Disabled) with WebTTY"
+		lockEmoji = "🔓"
+		titleText = "TERMUX SYSTEM DASHBOARD (TLS DISABLED)"
+	}
+
 	fmt.Println("\n==================================================")
-	fmt.Println("🔒 SECURE TERMUX SYSTEM DASHBOARD (GO SSL ENGINE)")
+	fmt.Printf("%s %s\n", lockEmoji, titleText)
 	fmt.Println("==================================================")
-	fmt.Println("Dashboard successfully loaded in HTTPS mode with WebTTY.")
+	fmt.Printf("Dashboard successfully loaded in %s.\n", modeText)
 	fmt.Println("\nLocal Access:")
-	fmt.Printf("   👉 https://localhost:%s\n", port)
+	fmt.Printf("   👉 %s://localhost:%s\n", scheme, port)
 
 	fmt.Println("\nNetwork Access (Wi-Fi/Tailscale):")
 	ips := getLocalIPs()
 	if len(ips) > 0 {
 		for _, ip := range ips {
-			fmt.Printf("   👉 https://%s:%s\n", ip, port)
+			fmt.Printf("   👉 %s://%s:%s\n", scheme, ip, port)
 		}
 	} else {
 		fmt.Println("   (No active connection detected)")

@@ -22,6 +22,9 @@ Aplikasi web dashboard untuk Termux Android menggunakan Go. Aplikasi ini berfung
 12. **Konfirmasi Android Koneksi**: Menampilkan notifikasi dan dialog konfirmasi persetujuan di layar HP ketika ada percobaan koneksi baru dari IP eksternal.
 13. **Log Koneksi**: Mencatat setiap aktivitas koneksi masuk ke dalam file `connections.log`.
 14. **Android Wake Lock**: Otomatis mengaktifkan wake lock (`termux-wake-lock`) untuk mencegah CPU Android tidur saat server berjalan, sehingga koneksi background tetap stabil.
+15. **Optimalisasi Tampilan Mobile & Desktop**: Dilengkapi bilah navigasi melayang (*floating bottom navigation*) khusus mobile, penyembunyian kolom tabel yang lebar, editor teks layar penuh, serta penyesuaian posisi notifikasi di HP.
+16. **Terminal Virtual Helper Bar**: Tombol virtual pintasan cepat (`Ctrl+C`, `Ctrl+D`, `Tab`, `Esc`, tombol navigasi arah panah, dan tombol pemicu fokus keyboard) untuk mengetik di layar HP Android dengan mudah.
+17. **Mode HTTP Non-TLS Opsional**: Mendukung penonaktifan SSL/TLS untuk mengatasi pemblokiran protokol Secure WebSocket (`wss://`) oleh peramban karena masalah sertifikat *self-signed*.
 
 ---
 
@@ -59,6 +62,13 @@ Biner akan membuat berkas `cert.pem` dan `key.pem` secara otomatis.
 1. Verifikasi IP pada `blacklist.txt` dan `whitelist.txt`.
 2. Verifikasi HTTP Basic Authentication.
 3. Dialog konfirmasi Android (khusus koneksi dari luar localhost).
+
+### 4. Mode HTTP Tanpa TLS (Plain HTTP)
+Apabila Anda mengalami kendala terminal WebSocket tidak berfungsi (*WebSocket connection failed*) karena peramban menolak koneksi `wss://` dengan sertifikat SSL *self-signed*, Anda dapat mematikan SSL/TLS dengan mendefinisikan variabel `DISABLE_TLS=true`:
+```bash
+DISABLE_TLS=true ./dashboard
+```
+Setelah dijalankan, Anda dapat mengakses dashboard menggunakan protokol HTTP biasa (misalnya `http://localhost:8443`), dan terminal akan menggunakan protokol `ws://` secara aman di jaringan lokal Anda.
 
 ---
 

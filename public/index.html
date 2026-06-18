@@ -408,23 +408,6 @@
             }
         }
 
-        /* Responsive Breakpoints */
-        @media (max-width: 768px) {
-            header {
-                flex-direction: column;
-                gap: 1.25rem;
-                padding-top: 1.5rem;
-                text-align: center;
-            }
-            main {
-                padding: 1rem;
-                gap: 1.5rem;
-            }
-            .card {
-                padding: 1.5rem;
-            }
-        }
-
         /* Tab Navigation */
         .tabs-nav {
             display: flex;
@@ -611,7 +594,235 @@
                 grid-column: span 2;
             }
         }
+
+        /* --- MOBILE RESPONSIVE ENHANCEMENTS --- */
+        .file-mobile-meta {
+            display: none;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        /* Terminal keyboard assistant styling */
+        .terminal-helper-bar {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn-helper {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            padding: 0.45rem 0.75rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+        
+        .btn-helper:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        
+        .btn-helper:active {
+            transform: scale(0.95);
+        }
+
+        /* Hide column helper classes */
+        .col-size, .col-mtime, .col-user, .col-mem {
+            transition: display 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: row !important;
+                justify-content: space-between;
+                align-items: center;
+                padding: 1.25rem 1rem 0.5rem !important;
+                gap: 0.5rem !important;
+            }
+
+            .logo h1 {
+                font-size: 1.25rem !important;
+            }
+
+            .logo i {
+                font-size: 1.6rem !important;
+            }
+
+            .status-badge {
+                padding: 0.35rem 0.75rem !important;
+                font-size: 0.75rem !important;
+            }
+
+            main {
+                padding: 1rem 0.75rem 6.5rem !important; /* Bottom spacing for mobile tab navigation */
+                gap: 1.25rem !important;
+            }
+
+            /* Floating bottom tab nav */
+            .tabs-nav {
+                position: fixed;
+                bottom: 1.25rem;
+                left: 50%;
+                transform: translateX(-50%);
+                width: calc(100% - 1.5rem);
+                max-width: 480px;
+                z-index: 1000;
+                justify-content: space-around;
+                background: rgba(11, 15, 25, 0.85);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+                border-radius: 20px;
+                padding: 0.4rem;
+                backdrop-filter: blur(20px) saturate(120%);
+                -webkit-backdrop-filter: blur(20px) saturate(120%);
+            }
+
+            .tab-btn {
+                flex-direction: column;
+                gap: 0.2rem;
+                font-size: 0.7rem;
+                padding: 0.5rem 0.6rem;
+                flex: 1;
+                border-radius: 14px;
+                background: transparent;
+                box-shadow: none;
+            }
+            
+            .tab-btn:hover {
+                background: rgba(255, 255, 255, 0.03);
+            }
+
+            .tab-btn.active {
+                color: #0b0f19;
+                background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+                box-shadow: 0 4px 12px rgba(0, 242, 254, 0.2);
+            }
+
+            .card {
+                padding: 1.25rem !important;
+                border-radius: 20px;
+            }
+
+            .grid-container {
+                grid-template-columns: 1fr !important;
+                gap: 1.25rem !important;
+            }
+
+            /* Responsive tables */
+            .col-mtime {
+                display: none !important;
+            }
+
+            .files-table th, .files-table td {
+                padding: 0.75rem 0.5rem !important;
+                font-size: 0.85rem;
+            }
+
+            .col-cmd {
+                max-width: 120px !important;
+            }
+
+            /* Terminal adaptation */
+            .terminal-card {
+                height: 500px !important;
+                padding: 1rem !important;
+            }
+
+            #terminal-container {
+                min-height: 300px !important;
+            }
+
+            /* Modal adaptations */
+            #editor-modal {
+                padding: 0.5rem !important;
+            }
+
+            #editor-modal .card {
+                height: 98% !important;
+                padding: 1rem !important;
+                border-radius: 16px !important;
+            }
+
+            #editor-textarea {
+                font-size: 0.85rem !important;
+                padding: 0.75rem !important;
+            }
+
+            /* Centered mobile toast */
+            .web-toast {
+                left: 50% !important;
+                right: auto !important;
+                transform: translate(-50%, 150%) !important;
+                bottom: 6.5rem !important; /* Floating above bottom nav */
+                width: calc(100% - 2rem) !important;
+                max-width: 380px !important;
+                justify-content: center;
+            }
+
+            .web-toast.show {
+                transform: translate(-50%, 0) !important;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .col-user, .col-mem {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .col-size {
+                display: none !important;
+            }
+
+            .file-mobile-meta {
+                display: block;
+            }
+
+            .input-wrapper {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+
+            .input-wrapper button, .input-wrapper .btn {
+                width: 100% !important;
+            }
+
+            .stat-val {
+                font-size: 0.95rem !important;
+            }
+
+            .stat-label {
+                font-size: 0.7rem !important;
+            }
+
+            .stats-grid {
+                gap: 0.75rem !important;
+            }
+
+            .chart-container {
+                height: 220px !important;
+            }
+            
+            .col-cmd {
+                max-width: 80px !important;
+            }
+        }
     </style>
+</style>
     <!-- xterm.css & xterm.js imports -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -842,8 +1053,19 @@
                     <div class="terminal-title">xterm - termux@android</div>
                     <div style="width: 40px;"></div>
                 </div>
-                <div id="terminal-container" style="flex: 1; background: #020408; border-radius: 12px; padding: 0.5rem; overflow: hidden; min-height: 480px;">
+                <div id="terminal-container" style="flex: 1; background: #020408; border-radius: 12px; padding: 0.5rem; overflow: hidden; min-height: 380px;">
                     <!-- xterm.js mounts here -->
+                </div>
+                <div class="terminal-helper-bar">
+                    <button class="btn-helper" data-key="ctrl-c">Ctrl+C</button>
+                    <button class="btn-helper" data-key="ctrl-d">Ctrl+D</button>
+                    <button class="btn-helper" data-key="tab">Tab</button>
+                    <button class="btn-helper" data-key="esc">Esc</button>
+                    <button class="btn-helper" data-key="up"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button class="btn-helper" data-key="down"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button class="btn-helper" data-key="left"><i class="fa-solid fa-arrow-left"></i></button>
+                    <button class="btn-helper" data-key="right"><i class="fa-solid fa-arrow-right"></i></button>
+                    <button class="btn-helper" id="btn-toggle-kbd" style="background: linear-gradient(135deg, var(--purple) 0%, #a855f7 100%); color: white;"><i class="fa-solid fa-keyboard"></i> Focus</button>
                 </div>
             </div>
         </div>
@@ -874,8 +1096,8 @@
                         <thead>
                             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">
                                 <th style="padding: 0.75rem;">Name</th>
-                                <th style="padding: 0.75rem; text-align: right;">Size</th>
-                                <th style="padding: 0.75rem; text-align: right;">Modified</th>
+                                <th class="col-size" style="padding: 0.75rem; text-align: right;">Size</th>
+                                <th class="col-mtime" style="padding: 0.75rem; text-align: right;">Modified</th>
                                 <th style="padding: 0.75rem; text-align: center; width: 140px;">Actions</th>
                             </tr>
                         </thead>
@@ -905,10 +1127,10 @@
                         <thead>
                             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">
                                 <th style="padding: 0.75rem; width: 80px;">PID</th>
-                                <th style="padding: 0.75rem; width: 100px;">User</th>
+                                <th class="col-user" style="padding: 0.75rem; width: 100px;">User</th>
                                 <th style="padding: 0.75rem; width: 80px; text-align: right;">CPU %</th>
-                                <th style="padding: 0.75rem; width: 80px; text-align: right;">MEM %</th>
-                                <th style="padding: 0.75rem;">Command</th>
+                                <th class="col-mem" style="padding: 0.75rem; width: 80px; text-align: right;">MEM %</th>
+                                <th class="col-cmd" style="padding: 0.75rem;">Command</th>
                                 <th style="padding: 0.75rem; text-align: center; width: 100px;">Action</th>
                             </tr>
                         </thead>
@@ -934,7 +1156,7 @@
                 </div>
             </div>
             <div style="flex: 1; display: flex; flex-direction: column; background: #020408; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
-                <textarea id="editor-textarea" style="flex: 1; width: 100%; height: 100%; background: transparent; border: none; outline: none; padding: 1rem; color: #39ff14; font-family: 'Courier New', Courier, monospace; font-size: 0.95rem; resize: none; line-height: 1.5;" placeholder="Ketik teks di sini..."></textarea>
+                <textarea id="editor-textarea" style="flex: 1; width: 100%; height: 100%; background: transparent; border: none; outline: none; padding: 1rem; color: #f3f4f6; font-family: 'Courier New', Courier, monospace; font-size: 0.95rem; resize: none; line-height: 1.5;" placeholder="Ketik teks di sini..."></textarea>
             </div>
         </div>
     </div>
@@ -1207,7 +1429,7 @@
         async function initTerminal() {
             if (term !== null) {
                 setTimeout(() => {
-                    fitAddon.fit();
+                    try { fitAddon.fit(); } catch(e) { console.error("xterm fit error", e); }
                     if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
                         wsTerminal.send(JSON.stringify({
                             type: 'resize',
@@ -1222,9 +1444,10 @@
             term = new Terminal({
                 cursorBlink: true,
                 theme: {
-                    background: '#020408',
-                    foreground: '#39ff14', // Matrix Green
-                    cursor: '#00f2fe'
+                    background: '#0b0f19',
+                    foreground: '#f3f4f6',
+                    cursor: '#00f2fe',
+                    selectionBackground: 'rgba(0, 242, 254, 0.3)'
                 },
                 fontFamily: 'Courier New, Courier, monospace',
                 fontSize: 14
@@ -1236,7 +1459,7 @@
             term.open(document.getElementById('terminal-container'));
             
             setTimeout(() => {
-                fitAddon.fit();
+                try { fitAddon.fit(); } catch(e) { console.error("xterm fit error", e); }
             }, 50);
 
             term.write('\x1b[33mRequesting secure one-time WebSocket token...\x1b[0m\r\n');
@@ -1296,7 +1519,7 @@
 
                 window.addEventListener('resize', () => {
                     if (term) {
-                        fitAddon.fit();
+                        try { fitAddon.fit(); } catch(e) { console.error("xterm fit error", e); }
                         if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
                             wsTerminal.send(JSON.stringify({
                                 type: 'resize',
@@ -1454,16 +1677,25 @@
                 const downloadBtn = file.isDir ? '' : `<button class="btn-action btn-download" data-path="${filePath}" title="Unduh" style="color: var(--secondary);"><i class="fa-solid fa-download"></i></button>`;
                 const editBtn = (!file.isDir && isEditableTextFile(file.name)) ? `<button class="btn-action btn-edit" data-path="${filePath}" title="Edit" style="color: var(--warning);"><i class="fa-solid fa-pen-to-square"></i></button>` : '';
 
+                const fileMeta = file.isDir ? '' : `<div class="file-mobile-meta">${sizeStr}</div>`;
                 row.innerHTML = `
                     <td class="name-cell" style="padding: 0.95rem 0.75rem;">
-                        ${icon} <span style="margin-left: 0.5rem;">${file.name}</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            ${icon}
+                            <div>
+                                <div>${file.name}</div>
+                                ${fileMeta}
+                            </div>
+                        </div>
                     </td>
-                    <td style="text-align: right; color: var(--text-muted);">${sizeStr}</td>
-                    <td style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">${file.mtime}</td>
+                    <td class="col-size" style="text-align: right; color: var(--text-muted);">${sizeStr}</td>
+                    <td class="col-mtime" style="text-align: right; color: var(--text-muted); font-size: 0.85rem;">${file.mtime}</td>
                     <td style="text-align: center;">
-                        ${editBtn}
-                        ${downloadBtn}
-                        ${deleteBtn}
+                        <div style="display: flex; gap: 0.25rem; justify-content: center;">
+                            ${editBtn}
+                            ${downloadBtn}
+                            ${deleteBtn}
+                        </div>
                     </td>
                 `;
 
@@ -1714,10 +1946,10 @@
                 
                 row.innerHTML = `
                     <td style="padding: 0.95rem 0.75rem; font-family: monospace; font-weight: 600;">${proc.pid}</td>
-                    <td style="color: var(--text-muted);">${proc.user}</td>
+                    <td class="col-user" style="color: var(--text-muted);">${proc.user}</td>
                     <td style="text-align: right; color: var(--warning); font-weight: 600;">${proc.cpu.toFixed(1)}%</td>
-                    <td style="text-align: right; color: var(--primary);">${proc.mem.toFixed(1)}%</td>
-                    <td style="font-family: monospace; font-size: 0.85rem; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${proc.command}">${proc.command}</td>
+                    <td class="col-mem" style="text-align: right; color: var(--primary);">${proc.mem.toFixed(1)}%</td>
+                    <td class="col-cmd" style="font-family: monospace; font-size: 0.85rem; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${proc.command}">${proc.command}</td>
                     <td style="text-align: center;">
                         <button class="btn-action btn-kill-proc" data-pid="${proc.pid}" data-name="${proc.command}" style="color: var(--danger);"><i class="fa-solid fa-ban"></i> Kill</button>
                     </td>
@@ -1756,6 +1988,54 @@
         initPerformanceChart();
         fetchStats();
         setInterval(fetchStats, 3000);
+        // Terminal virtual keyboard helper key handlers
+        function sendTerminalKey(keyData) {
+            if (wsTerminal && wsTerminal.readyState === WebSocket.OPEN) {
+                wsTerminal.send(JSON.stringify({
+                    type: 'input',
+                    data: keyData
+                }));
+            }
+            if (term) {
+                term.focus();
+            }
+        }
+
+        document.querySelectorAll('.btn-helper').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const keyType = btn.getAttribute('data-key');
+                if (!keyType) return;
+                
+                let keyData = '';
+                switch (keyType) {
+                    case 'ctrl-c': keyData = '\x03'; break;
+                    case 'ctrl-d': keyData = '\x04'; break;
+                    case 'tab': keyData = '\t'; break;
+                    case 'esc': keyData = '\x1b'; break;
+                    case 'up': keyData = '\x1b[A'; break;
+                    case 'down': keyData = '\x1b[B'; break;
+                    case 'left': keyData = '\x1b[D'; break;
+                    case 'right': keyData = '\x1b[C'; break;
+                }
+                if (keyData) {
+                    sendTerminalKey(keyData);
+                }
+            });
+        });
+
+        const toggleKbdBtn = document.getElementById('btn-toggle-kbd');
+        if (toggleKbdBtn) {
+            toggleKbdBtn.addEventListener('click', () => {
+                if (term) {
+                    term.focus();
+                    const textarea = document.querySelector('.xterm-helper-textarea');
+                    if (textarea) {
+                        textarea.focus();
+                        textarea.click();
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>
