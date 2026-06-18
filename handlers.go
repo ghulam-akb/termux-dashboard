@@ -469,6 +469,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !isLocalNetwork(ip) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Login using local credentials from a public/external network is blocked."})
+		return
+	}
+
 	var payload LoginPayload
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		w.WriteHeader(http.StatusBadRequest)

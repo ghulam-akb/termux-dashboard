@@ -329,6 +329,23 @@ func ipMatchesLine(clientIPStr, line string) bool {
 	return clientIPStr == line
 }
 
+var _, cgnatNet, _ = net.ParseCIDR("100.64.0.0/10")
+
+func isLocalNetwork(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if cgnatNet != nil && cgnatNet.Contains(ip) {
+		return true
+	}
+	return false
+}
+
+
 func logConnection(ip string, r *http.Request) {
 	if r.URL.Path == "/api/stats" {
 		return
