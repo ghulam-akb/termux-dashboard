@@ -47,6 +47,8 @@ func main() {
 
 	// API Endpoints
 	mux.HandleFunc("GET /api/stats", handleStats)
+	mux.HandleFunc("POST /api/login", handleLogin)
+	mux.HandleFunc("POST /api/logout", handleLogout)
 	mux.HandleFunc("POST /api/vibrate", handleVibrate)
 	mux.HandleFunc("POST /api/tts", handleTTS)
 	mux.HandleFunc("POST /api/toast", handleToast)
@@ -59,6 +61,8 @@ func main() {
 	mux.HandleFunc("POST /api/files/delete", handleFileDelete)
 	mux.HandleFunc("GET /api/files/view", handleFileView)
 	mux.HandleFunc("POST /api/files/save", handleFileSave)
+	mux.HandleFunc("POST /api/files/create", handleFileCreate)
+	mux.HandleFunc("POST /api/files/rename", handleFileRename)
 
 	// Process Manager Endpoints
 	mux.HandleFunc("GET /api/processes", handleProcessList)

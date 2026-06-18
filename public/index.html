@@ -304,7 +304,7 @@
             gap: 0.75rem;
         }
 
-        input[type="text"] {
+        input[type="text"], input[type="password"] {
             flex: 1;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--glass-border);
@@ -316,7 +316,7 @@
             outline: none;
         }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus, input[type="password"]:focus {
             background: rgba(255, 255, 255, 0.06);
             border-color: var(--primary);
             box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
@@ -845,7 +845,10 @@
             <button class="tab-btn" data-tab="processes-pane" id="tab-btn-processes"><i class="fa-solid fa-list-check"></i> Processes</button>
         </nav>
 
-        <div class="status-badge" id="online-status">Connected</div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <div class="status-badge" id="online-status">Connected</div>
+            <button id="btn-logout" class="btn-action" title="Log Out" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); padding: 0.5rem 0.75rem; border-radius: 12px; color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
     </header>
 
     <main>
@@ -924,6 +927,24 @@
                         </div>
                         <div class="progress-bar-bg">
                             <div class="progress-bar-fill" id="cpu-fill" style="background: linear-gradient(90deg, var(--warning), var(--danger))"></div>
+                        </div>
+                    </div>
+
+                    <!-- Network Traffic -->
+                    <div style="margin-top: 1.75rem; display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.04); padding: 0.85rem 1.25rem; border-radius: 16px;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--primary);">
+                            <i class="fa-solid fa-download"></i>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Download</div>
+                                <div id="net-rx-text" style="font-size: 0.95rem; font-weight: 600; color: var(--text);">0 KB/s</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--purple);">
+                            <i class="fa-solid fa-upload"></i>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Upload</div>
+                                <div id="net-tx-text" style="font-size: 0.95rem; font-weight: 600; color: var(--text);">0 KB/s</div>
+                            </div>
                         </div>
                     </div>
 
@@ -1078,12 +1099,17 @@
                         <i class="fa-solid fa-folder-tree"></i>
                         File Explorer
                     </div>
-                    <div class="file-actions" style="display: flex; gap: 0.75rem; align-items: center;">
-                        <button id="btn-file-up" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text);"><i class="fa-solid fa-arrow-up"></i> Up</button>
-                        <label class="btn" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: #0b0f19;">
-                            <i class="fa-solid fa-upload"></i> Upload File
-                            <input type="file" id="file-upload-input" style="display: none;">
-                        </label>
+                    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+                        <input type="text" id="file-search-input" placeholder="Search files..." style="padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; max-width: 150px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); color: var(--text); outline: none;">
+                        <div class="file-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <button id="btn-file-up" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text);"><i class="fa-solid fa-arrow-up"></i> Up</button>
+                            <button id="btn-file-newfile" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text);"><i class="fa-solid fa-file-circle-plus"></i> +File</button>
+                            <button id="btn-file-newdir" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); color: var(--text);"><i class="fa-solid fa-folder-plus"></i> +Folder</button>
+                            <label class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: #0b0f19;">
+                                <i class="fa-solid fa-upload"></i> Upload
+                                <input type="file" id="file-upload-input" style="display: none;">
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
@@ -1117,8 +1143,11 @@
                         <i class="fa-solid fa-list-check"></i>
                         Active Processes
                     </div>
-                    <div class="process-actions">
-                        <button id="btn-refresh-processes" style="padding: 0.5rem 1.25rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; color: #0b0f19;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <input type="text" id="process-search-input" placeholder="Search..." style="padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; max-width: 150px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); color: var(--text); outline: none;">
+                        <div class="process-actions">
+                            <button id="btn-refresh-processes" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--secondary), var(--primary)); border: none; border-radius: 14px; font-weight: 600; cursor: pointer; color: #0b0f19;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                        </div>
                     </div>
                 </div>
                 
@@ -1126,11 +1155,11 @@
                     <table class="files-table">
                         <thead>
                             <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                <th style="padding: 0.75rem; width: 80px;">PID</th>
-                                <th class="col-user" style="padding: 0.75rem; width: 100px;">User</th>
-                                <th style="padding: 0.75rem; width: 80px; text-align: right;">CPU %</th>
-                                <th class="col-mem" style="padding: 0.75rem; width: 80px; text-align: right;">MEM %</th>
-                                <th class="col-cmd" style="padding: 0.75rem;">Command</th>
+                                <th id="th-pid" style="padding: 0.75rem; width: 80px; cursor: pointer;">PID <span class="sort-icon"></span></th>
+                                <th id="th-user" class="col-user" style="padding: 0.75rem; width: 100px; cursor: pointer;">User <span class="sort-icon"></span></th>
+                                <th id="th-cpu" style="padding: 0.75rem; width: 80px; text-align: right; cursor: pointer;">CPU % <span class="sort-icon">▼</span></th>
+                                <th id="th-mem" class="col-mem" style="padding: 0.75rem; width: 80px; text-align: right; cursor: pointer;">MEM % <span class="sort-icon"></span></th>
+                                <th id="th-cmd" class="col-cmd" style="padding: 0.75rem; cursor: pointer;">Command <span class="sort-icon"></span></th>
                                 <th style="padding: 0.75rem; text-align: center; width: 100px;">Action</th>
                             </tr>
                         </thead>
@@ -1167,6 +1196,30 @@
         <p>Termux Dashboard &copy; 2026. Made with Glassmorphism Design.</p>
         <p style="font-size: 0.75rem; opacity: 0.6; margin-top: 0.25rem;">Developed by <a href="https://github.com/ghulam-akb" target="_blank" style="color: inherit; text-decoration: underline;">ghulam-akb</a></p>
     </footer>
+
+    <!-- UI Login Overlay Modal -->
+    <div id="login-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); background-image: radial-gradient(at 10% 10%, rgba(191, 85, 236, 0.15) 0px, transparent 50%), radial-gradient(at 90% 10%, rgba(79, 172, 254, 0.15) 0px, transparent 50%), radial-gradient(at 50% 90%, rgba(0, 242, 254, 0.1) 0px, transparent 50%); display: none; z-index: 2000; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div class="card" style="width: 100%; max-width: 420px; padding: 2.5rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 28px; box-shadow: 0 15px 45px var(--glass-shadow); text-align: center; backdrop-filter: blur(20px) saturate(120%); -webkit-backdrop-filter: blur(20px) saturate(120%);">
+            <div style="margin-bottom: 2rem;">
+                <i class="fa-solid fa-mobile-screen-button" style="font-size: 3rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 12px rgba(0, 242, 254, 0.4)); margin-bottom: 1rem;"></i>
+                <h2 style="font-weight: 800; letter-spacing: 1px; font-size: 1.75rem; background: linear-gradient(135deg, var(--text), var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">TERMUX DASHBOARD</h2>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">Masukkan kredensial admin untuk masuk</p>
+            </div>
+            
+            <form id="login-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Username</label>
+                    <input type="text" id="login-username" placeholder="admin" required style="width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 0.85rem 1.25rem; border-radius: 14px; color: var(--text); outline: none;">
+                </div>
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required style="width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 0.85rem 1.25rem; border-radius: 14px; color: var(--text); outline: none;">
+                </div>
+                <div id="login-error-msg" style="color: var(--danger); font-size: 0.85rem; text-align: left; display: none;"></div>
+                <button type="submit" class="btn btn-block" style="width: 100%; margin-top: 0.5rem; padding: 1rem; font-weight: 600; border-radius: 14px; color: #0b0f19;">Sign In</button>
+            </form>
+        </div>
+    </div>
 
     <!-- UI Toast Element -->
     <div class="web-toast" id="ui-toast">
@@ -1257,6 +1310,10 @@
         async function fetchStats() {
             try {
                 const res = await fetch(`${API_URL}/api/stats`);
+                if (res.status === 401) {
+                    loginOverlay.style.display = 'flex';
+                    return;
+                }
                 if (!res.ok) throw new Error('API server issue');
                 const data = await res.json();
                 
@@ -1322,6 +1379,14 @@
 
             // 4. Uptime
             uptimeVal.innerText = data.uptime || 'Unavailable';
+
+            // Network speeds
+            const netRxText = document.getElementById('net-rx-text');
+            const netTxText = document.getElementById('net-tx-text');
+            if (netRxText && netTxText) {
+                netRxText.innerText = data.net_rx !== undefined ? formatSpeed(data.net_rx) : '0 KB/s';
+                netTxText.innerText = data.net_tx !== undefined ? formatSpeed(data.net_tx) : '0 KB/s';
+            }
 
             // 5. CPU Utilization
             const cpu = data.cpu || {};
@@ -1466,6 +1531,7 @@
 
             try {
                 const tokenRes = await fetch(`${API_URL}/api/token`, { method: 'POST' });
+                if (tokenRes.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!tokenRes.ok) throw new Error('Auth token generation failed');
                 const tokenData = await tokenRes.json();
                 const token = tokenData.token;
@@ -1571,16 +1637,20 @@
         const fileUploadInput = document.getElementById('file-upload-input');
         const btnFileUp = document.getElementById('btn-file-up');
 
+        let currentFilesCache = [];
+
         async function loadFiles(path) {
             fileTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;">Loading files list...</td></tr>';
             try {
                 const res = await fetch(`/api/files/list?path=${encodeURIComponent(path)}`);
+                if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!res.ok) throw new Error('Failed to read folder');
                 const files = await res.json();
                 
                 currentPath = path;
                 fileBreadcrumbs.innerText = currentPath;
-                renderFileList(files);
+                currentFilesCache = files;
+                filterAndRenderFiles();
             } catch (err) {
                 showToast(err.message, 'error');
                 fileTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--danger);">Error: ${err.message}</td></tr>`;
@@ -1723,6 +1793,34 @@
                         });
                     }
                 }
+
+                // Rename Button Event
+                row.querySelector('.btn-rename').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const newName = prompt('Masukkan nama baru (termasuk ekstensi):', file.name);
+                    if (!newName || newName === file.name) return;
+                    
+                    const oldP = currentPath + '/' + file.name;
+                    const newP = currentPath + '/' + newName;
+                    
+                    try {
+                        const renameRes = await fetch('/api/files/rename', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ oldPath: oldP, newPath: newP })
+                        });
+                        if (renameRes.status === 401) { loginOverlay.style.display = 'flex'; return; }
+                        if (renameRes.ok) {
+                            showToast('Nama berhasil diubah!');
+                            loadFiles(currentPath);
+                        } else {
+                            const errData = await renameRes.json();
+                            showToast(errData.error || 'Gagal mengubah nama', 'error');
+                        }
+                    } catch (err) {
+                        showToast('Gagal terhubung ke server', 'error');
+                    }
+                });
 
                 // Delete Event
                 row.querySelector('.btn-delete').addEventListener('click', async (e) => {
@@ -1917,13 +2015,17 @@
         const processTableBody = document.getElementById('process-table-body');
         const btnRefreshProcesses = document.getElementById('btn-refresh-processes');
 
+        let currentProcessesCache = [];
+
         async function loadProcesses() {
             processTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading active processes...</td></tr>';
             try {
                 const res = await fetch('/api/processes');
+                if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
                 if (!res.ok) throw new Error('Failed to read processes list');
                 const list = await res.json();
-                renderProcessList(list);
+                currentProcessesCache = list;
+                filterAndRenderProcesses();
             } catch (err) {
                 showToast(err.message, 'error');
                 processTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--danger);">Error: ${err.message}</td></tr>`;
@@ -2036,6 +2138,193 @@
                 }
             });
         }
+
+        // --- NEW FEATURES JAVASCRIPT HANDLERS ---
+
+        // Login UI & Auth Elements
+        const loginOverlay = document.getElementById('login-overlay');
+        const loginForm = document.getElementById('login-form');
+        const loginUsernameInput = document.getElementById('login-username');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginErrorMsg = document.getElementById('login-error-msg');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = loginUsernameInput.value;
+            const password = loginPasswordInput.value;
+            loginErrorMsg.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (res.ok) {
+                    loginOverlay.style.display = 'none';
+                    loginPasswordInput.value = '';
+                    fetchStats();
+                } else {
+                    const err = await res.json();
+                    loginErrorMsg.innerText = err.error || 'Login gagal';
+                    loginErrorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                loginErrorMsg.innerText = 'Gagal menghubungkan ke server';
+                loginErrorMsg.style.display = 'block';
+            }
+        });
+
+        // Logout button
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+            if (confirm('Apakah Anda yakin ingin keluar?')) {
+                try {
+                    await fetch('/api/logout', { method: 'POST' });
+                } catch(e) {}
+                loginOverlay.style.display = 'flex';
+            }
+        });
+
+        // Network Speed Formatter
+        function formatSpeed(kbps) {
+            if (kbps < 1024) {
+                return kbps.toFixed(1) + ' KB/s';
+            }
+            return (kbps / 1024).toFixed(1) + ' MB/s';
+        }
+
+        // File Explorer filtering, creation
+        const fileSearchInput = document.getElementById('file-search-input');
+        fileSearchInput.addEventListener('input', filterAndRenderFiles);
+
+        function filterAndRenderFiles() {
+            const query = fileSearchInput.value.toLowerCase().trim();
+            const filtered = currentFilesCache.filter(file => file.name.toLowerCase().includes(query));
+            renderFileList(filtered);
+        }
+
+        document.getElementById('btn-file-newfile').addEventListener('click', async () => {
+            const name = prompt('Masukkan nama file baru (misal: script.sh):');
+            if (!name) return;
+            const newFilePath = currentPath + '/' + name;
+            
+            try {
+                const res = await fetch('/api/files/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: newFilePath, isDir: false })
+                });
+                if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
+                if (res.ok) {
+                    showToast('File berhasil dibuat!');
+                    loadFiles(currentPath);
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Gagal membuat file', 'error');
+                }
+            } catch (err) {
+                showToast('Gagal terhubung ke server', 'error');
+            }
+        });
+
+        document.getElementById('btn-file-newdir').addEventListener('click', async () => {
+            const name = prompt('Masukkan nama folder baru:');
+            if (!name) return;
+            const newDirPath = currentPath + '/' + name;
+            
+            try {
+                const res = await fetch('/api/files/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: newDirPath, isDir: true })
+                });
+                if (res.status === 401) { loginOverlay.style.display = 'flex'; return; }
+                if (res.ok) {
+                    showToast('Folder berhasil dibuat!');
+                    loadFiles(currentPath);
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || 'Gagal membuat folder', 'error');
+                }
+            } catch (err) {
+                showToast('Gagal terhubung ke server', 'error');
+            }
+        });
+
+        // Processes filtering and column sorting
+        const processSearchInput = document.getElementById('process-search-input');
+        processSearchInput.addEventListener('input', filterAndRenderProcesses);
+
+        let processSortColumn = 'cpu';
+        let processSortDirection = 'desc';
+
+        function filterAndRenderProcesses() {
+            const query = processSearchInput.value.toLowerCase().trim();
+            let filtered = currentProcessesCache;
+            if (query) {
+                filtered = currentProcessesCache.filter(proc => 
+                    proc.pid.toString().includes(query) || 
+                    proc.command.toLowerCase().includes(query) || 
+                    proc.user.toLowerCase().includes(query)
+                );
+            }
+            sortAndRenderProcesses(filtered);
+        }
+
+        function sortAndRenderProcesses(list) {
+            list.sort((a, b) => {
+                let valA = a[processSortColumn];
+                let valB = b[processSortColumn];
+
+                if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    valB = valB.toLowerCase();
+                }
+
+                if (valA < valB) return processSortDirection === 'asc' ? -1 : 1;
+                if (valA > valB) return processSortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            renderProcessList(list);
+        }
+
+        const headers = [
+            { id: 'th-pid', key: 'pid' },
+            { id: 'th-user', key: 'user' },
+            { id: 'th-cpu', key: 'cpu' },
+            { id: 'th-mem', key: 'mem' },
+            { id: 'th-cmd', key: 'command' }
+        ];
+
+        headers.forEach(h => {
+            const el = document.getElementById(h.id);
+            if (el) {
+                el.style.userSelect = 'none';
+                el.addEventListener('click', () => {
+                    if (processSortColumn === h.key) {
+                        processSortDirection = processSortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        processSortColumn = h.key;
+                        processSortDirection = 'desc';
+                    }
+                    
+                    headers.forEach(x => {
+                        const iconEl = document.getElementById(x.id).querySelector('.sort-icon');
+                        if (iconEl) {
+                            if (x.key === processSortColumn) {
+                                iconEl.innerText = processSortDirection === 'asc' ? ' ▲' : ' ▼';
+                            } else {
+                                iconEl.innerText = '';
+                            }
+                        }
+                    });
+
+                    filterAndRenderProcesses();
+                });
+            }
+        });
     </script>
 </body>
 </html>

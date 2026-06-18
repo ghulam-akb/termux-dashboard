@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Request/Response structures
@@ -57,6 +60,7 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	rx, tx := getNetworkSpeeds()
 	stats := StatsResponse{
 		Battery: getBatteryInfo(),
 		RAM:     getRAMInfo(),
@@ -64,6 +68,8 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		Uptime:  getUptimeInfo(),
 		CPU:     getCPUInfo(),
 		System:  getSystemInfo(),
+		NetRX:   rx,
+		NetTX:   tx,
 	}
 
 	json.NewEncoder(w).Encode(stats)
@@ -426,4 +432,170 @@ func handleProcessKill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"status": "Killed"})
+}
+
+// PAYLOADS FOR LOGIN/LOGOUT & FILE ACTIONS
+type LoginPayload struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type FileCreatePayload struct {
+	Path  string `json:"path"`
+	IsDir bool   `json:"isDir"`
+}
+
+type FileRenamePayload struct {
+	OldPath string `json:"oldPath"`
+	NewPath string `json:"newPath"`
+}
+
+// HANDLERS FOR LOGIN/LOGOUT
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ip = strings.Split(xff, ",")[0]
+	}
+
+	if isIPBanned(ip) {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Too many failed attempts. Banned for 15 minutes."})
+		return
+	}
+
+	var payload LoginPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid payload"})
+		return
+	}
+
+	isValid := false
+	if payload.Username == basicUser {
+		err := bcrypt.CompareHashAndPassword([]byte(basicPass), []byte(payload.Password))
+		if err == nil {
+			isValid = true
+		} else if basicPass == payload.Password {
+			isValid = true
+		}
+	}
+
+	if !isValid {
+		registerFailedAttempt(ip)
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		return
+	}
+
+	clearFailedAttempts(ip)
+
+	token := generateSessionToken()
+	addSession(token)
+
+	disableTLS := os.Getenv("DISABLE_TLS") == "true"
+	cookie := &http.Cookie{
+		Name:     "session_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   !disableTLS,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400,
+	}
+	http.SetCookie(w, cookie)
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func handleLogout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	cookie, err := r.Cookie("session_token")
+	if err == nil {
+		removeSession(cookie.Value)
+	}
+
+	delCookie := &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	}
+	http.SetCookie(w, delCookie)
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+// HANDLERS FOR FILE MANAGER CREATION & RENAMING
+func handleFileCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var payload FileCreatePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid payload"})
+		return
+	}
+
+	path := filepath.Clean(payload.Path)
+	if path == "/" || path == "/data" || path == "/data/data" || path == "/data/data/com.termux" {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Creating files in critical system directories is forbidden"})
+		return
+	}
+
+	var err error
+	if payload.IsDir {
+		err = os.MkdirAll(path, 0755)
+	} else {
+		err = os.WriteFile(path, []byte(""), 0644)
+	}
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create: " + err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "Created"})
+}
+
+func handleFileRename(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var payload FileRenamePayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid payload"})
+		return
+	}
+
+	oldPath := filepath.Clean(payload.OldPath)
+	newPath := filepath.Clean(payload.NewPath)
+
+	if oldPath == "/" || oldPath == "/data" || oldPath == "/data/data" || oldPath == "/data/data/com.termux" ||
+		newPath == "/" || newPath == "/data" || newPath == "/data/data" || newPath == "/data/data/com.termux" {
+		w.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Modifying critical system directories is forbidden"})
+		return
+	}
+
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to rename/move: " + err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"status": "Renamed"})
 }

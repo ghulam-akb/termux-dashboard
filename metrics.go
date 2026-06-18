@@ -62,12 +62,79 @@ type StatsResponse struct {
 	Uptime  string      `json:"uptime"`
 	CPU     CPUInfo     `json:"cpu"`
 	System  SystemInfo  `json:"system"`
+	NetRX   float64     `json:"net_rx"`
+	NetTX   float64     `json:"net_tx"`
 }
 
 var (
 	globalCPUUsage      float64
 	globalCPUUsageMutex sync.RWMutex
+
+	// Network Traffic sampling
+	prevNetTime  time.Time
+	prevRxBytes  uint64
+	prevTxBytes  uint64
+	netSpeedMutex sync.Mutex
+	currRxSpeed  float64
+	currTxSpeed  float64
 )
+
+func getNetworkSpeeds() (float64, float64) {
+	netSpeedMutex.Lock()
+	defer netSpeedMutex.Unlock()
+	return currRxSpeed, currTxSpeed
+}
+
+func updateNetworkSpeeds() {
+	content, err := os.ReadFile("/proc/net/dev")
+	if err != nil {
+		return
+	}
+
+	lines := strings.Split(string(content), "\n")
+	var totalRx uint64
+	var totalTx uint64
+
+	for _, line := range lines {
+		if !strings.Contains(line, ":") {
+			continue
+		}
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+		iface := strings.TrimSpace(parts[0])
+		if iface == "lo" {
+			continue
+		}
+
+		fields := strings.Fields(parts[1])
+		if len(fields) < 9 {
+			continue
+		}
+
+		rx, _ := strconv.ParseUint(fields[0], 10, 64)
+		tx, _ := strconv.ParseUint(fields[8], 10, 64)
+
+		totalRx += rx
+		totalTx += tx
+	}
+
+	netSpeedMutex.Lock()
+	defer netSpeedMutex.Unlock()
+
+	now := time.Now()
+	if !prevNetTime.IsZero() {
+		duration := now.Sub(prevNetTime).Seconds()
+		if duration > 0 {
+			currRxSpeed = float64(totalRx-prevRxBytes) / 1024.0 / duration
+			currTxSpeed = float64(totalTx-prevTxBytes) / 1024.0 / duration
+		}
+	}
+	prevNetTime = now
+	prevRxBytes = totalRx
+	prevTxBytes = totalTx
+}
 
 func acquireWakeLock() {
 	_, err := exec.LookPath("termux-wake-lock")
@@ -347,6 +414,7 @@ func watchCPUUsage(ctx context.Context) {
 		globalCPUUsage = usage
 		globalCPUUsageMutex.Unlock()
 	}
+	updateNetworkSpeeds()
 
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
@@ -362,6 +430,7 @@ func watchCPUUsage(ctx context.Context) {
 				globalCPUUsage = usage
 				globalCPUUsageMutex.Unlock()
 			}
+			updateNetworkSpeeds()
 		}
 	}
 }

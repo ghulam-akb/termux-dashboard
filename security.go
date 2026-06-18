@@ -28,7 +28,72 @@ var (
 
 	basicUser = "admin"
 	basicPass = "" // Bcrypt hash of the password
+
+	// Cookie Sessions & Fail2Ban
+	sessions       = make(map[string]time.Time)
+	sessionsMutex  sync.RWMutex
+	failedAttempts = make(map[string]int)
+	bannedIPs      = make(map[string]time.Time)
+	securityMutex  sync.Mutex
 )
+
+func generateSessionToken() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return fmt.Sprintf("%x", b)
+}
+
+func addSession(token string) {
+	sessionsMutex.Lock()
+	defer sessionsMutex.Unlock()
+	sessions[token] = time.Now().Add(24 * time.Hour)
+}
+
+func isValidSession(token string) bool {
+	sessionsMutex.RLock()
+	defer sessionsMutex.RUnlock()
+	expiry, exists := sessions[token]
+	if !exists {
+		return false
+	}
+	return time.Now().Before(expiry)
+}
+
+func removeSession(token string) {
+	sessionsMutex.Lock()
+	defer sessionsMutex.Unlock()
+	delete(sessions, token)
+}
+
+func isIPBanned(ip string) bool {
+	securityMutex.Lock()
+	defer securityMutex.Unlock()
+	expiry, exists := bannedIPs[ip]
+	if !exists {
+		return false
+	}
+	if time.Now().After(expiry) {
+		delete(bannedIPs, ip)
+		delete(failedAttempts, ip)
+		return false
+	}
+	return true
+}
+
+func registerFailedAttempt(ip string) {
+	securityMutex.Lock()
+	defer securityMutex.Unlock()
+	failedAttempts[ip]++
+	if failedAttempts[ip] >= 3 {
+		bannedIPs[ip] = time.Now().Add(15 * time.Minute)
+	}
+}
+
+func clearFailedAttempts(ip string) {
+	securityMutex.Lock()
+	defer securityMutex.Unlock()
+	delete(failedAttempts, ip)
+}
 
 func initAuth() {
 	var plainPass string
@@ -79,6 +144,13 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			ip = strings.Split(xff, ",")[0]
 		}
 
+		// Fail2Ban check
+		if isIPBanned(ip) {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, "Access Denied: Your IP is temporarily banned due to too many failed login attempts.\n")
+			return
+		}
+
 		// Step A: Check Whitelist & Blacklist Access
 		allowed, reason := checkIPAccess(ip)
 		if !allowed {
@@ -88,26 +160,16 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Step B: Check HTTP Basic Authentication (skip for WebSocket endpoint)
-		if r.URL.Path != "/ws/terminal" {
-			user, pass, ok := r.BasicAuth()
-			
-			// Verify username and verify password using bcrypt (or plain text fallback)
-			isValid := false
-			if ok && user == basicUser {
-				err := bcrypt.CompareHashAndPassword([]byte(basicPass), []byte(pass))
-				if err == nil {
-					isValid = true
-				} else if basicPass == pass { // Plain text fallback
-					isValid = true
+		// Step B: Check Session Cookie (skip for /api/login and /ws/terminal)
+		if r.URL.Path != "/api/login" && r.URL.Path != "/ws/terminal" {
+			cookie, err := r.Cookie("session_token")
+			if err != nil || !isValidSession(cookie.Value) {
+				if strings.HasPrefix(r.URL.Path, "/api/") {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized"})
+					return
 				}
-			}
-
-			if !isValid {
-				w.Header().Set("WWW-Authenticate", `Basic realm="Secure Termux Dashboard"`)
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte("401 Unauthorized - Access Denied\n"))
-				return
 			}
 		}
 
